@@ -59,7 +59,7 @@ function peso($value) {
 
     <div class="card border-0 shadow-sm p-3 mb-4 bg-light">
         <form action="/deduction" method="get" class="row g-2 align-items-center">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <select name="office_id" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
                     <option value="">Select Office Assignment...</option>
                     <?php foreach ($offices as $office): ?>
@@ -69,15 +69,32 @@ function peso($value) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-3">
+                <select name="bank_filter" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                    <option value="">Filter by Bank / Payable...</option>
+                    <option value="lbp" <?= ($bank_filter ?? '') === 'lbp' ? 'selected' : '' ?>>LandBank (LBP)</option>
+                    <option value="mcc" <?= ($bank_filter ?? '') === 'mcc' ? 'selected' : '' ?>>MCC</option>
+                    <option value="1stvb" <?= ($bank_filter ?? '') === '1stvb' ? 'selected' : '' ?>>1stVB</option>
+                    <option value="rbt" <?= ($bank_filter ?? '') === 'rbt' ? 'selected' : '' ?>>RBT</option>
+                    <option value="other" <?= ($bank_filter ?? '') === 'other' ? 'selected' : '' ?>>Other Payables</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="gsis_filter" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                    <option value="">Filter by GSIS Type...</option>
+                    <option value="premium" <?= ($gsis_filter ?? '') === 'premium' ? 'selected' : '' ?>>GSIS Personal Premium (9%)</option>
+                    <option value="policy" <?= ($gsis_filter ?? '') === 'policy' ? 'selected' : '' ?>>GSIS Conso / Policy</option>
+                    <option value="other" <?= ($gsis_filter ?? '') === 'other' ? 'selected' : '' ?>>GSIS GFAL / Emergency</option>
+                    <option value="ouli" <?= ($gsis_filter ?? '') === 'ouli' ? 'selected' : '' ?>>GSIS OULI</option>
+                    <option value="diff" <?= ($gsis_filter ?? '') === 'diff' ? 'selected' : '' ?>>GSIS Differential</option>
+                </select>
+            </div>
+            <div class="col-md-3">
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
                     <input type="text" name="search" class="form-control border-0" 
-                           placeholder="Search employee ID or name..." value="<?= esc($search ?? '') ?>">
+                           placeholder="Search ID or name..." value="<?= esc($search ?? '') ?>">
                 </div>
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-success w-100">Search</button>
             </div>
         </form>
     </div>

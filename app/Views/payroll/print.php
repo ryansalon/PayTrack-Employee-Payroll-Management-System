@@ -82,32 +82,33 @@ function employeeDeductions($emp) {
                 print-color-adjust: exact;
             }
             .payroll-table {
-                font-size: 0.65rem;
+                font-size: 0.58rem !important;
             }
             .payroll-table thead th,
-            .payroll-table tbody td {
-                padding: 3px 4px !important;
-                font-size: 0.65rem;
+            .payroll-table tbody td,
+            .payroll-table tfoot td {
+                padding: 2px 3px !important;
+                font-size: 0.58rem !important;
             }
             .payroll-table thead th {
-                font-size: 0.6rem;
+                font-size: 0.55rem !important;
             }
             .table-responsive {
-                zoom: 0.82;
+                zoom: 0.75;
             }
             .print-footer p {
-                font-size: 0.65rem !important;
+                font-size: 0.58rem !important;
             }
             .print-footer .fw-bold {
-                font-size: 0.75rem !important;
+                font-size: 0.65rem !important;
             }
             .page-break {
                 break-before: page;
                 page-break-before: always;
             }
             @page {
-                size: A4 landscape;
-                margin: 0.25in;
+                size: 8.5in 5.5in landscape; /* 1/2 Crosswise landscape paper size */
+                margin: 0.15in;
             }
         }
     </style>
@@ -117,19 +118,18 @@ function employeeDeductions($emp) {
     <div class="d-flex justify-content-between align-items-center mb-3 no-print">
         <div>
             <h5 class="fw-bold mb-0">Payroll — <?= esc($period_label ?? date('F Y')) ?> — <?= safeOfficeName($office_id ?? null, $offices ?? []) ?></h5>
-            <p class="text-muted small mb-0">Period of Service: <?= esc($service_period ?? '') ?></p>
+            <p class="text-muted small mb-0">Period of Service: <?= esc($service_period ?? '') ?> | Paper Target: <strong>1/2 Crosswise (8.5" x 5.5" Landscape)</strong></p>
         </div>
-        <div>
-            <button type="button" class="btn btn-success btn-sm" onclick="window.print()">
-                <i class="fas fa-print me-1"></i> Print
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-success btn-sm px-3" onclick="window.print()">
+                <i class="fas fa-print me-1"></i> Print (1/2 Crosswise)
             </button>
-            <a href="<?= '/payroll/export' . ($office_id ? '?office_id=' . $office_id : '') ?>" class="btn btn-outline-secondary">
-                <i class="fas fa-file-excel me-1"></i> Export
+            <a href="<?= '/payroll/export' . ($office_id ? '?office_id=' . $office_id : '') ?>" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-file-excel me-1"></i> Export Excel
             </a>
             <a href="/payroll" class="btn btn-outline-dark btn-sm">
                 <i class="fas fa-arrow-left me-1"></i> Back
             </a>
-            <small class="text-muted mt-1 d-block">Tip: Uncheck "Headers &amp; footers" and check "Background graphics". Paper: A4 Landscape.</small>
         </div>
     </div>
 

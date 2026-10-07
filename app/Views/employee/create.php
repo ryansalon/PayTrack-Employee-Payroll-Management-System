@@ -27,7 +27,12 @@
                             <input type="hidden" name="office_id" id="office_id">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small fw-bold">CONTACT NUMBER</label>
+                            <label class="form-label text-primary small fw-bold"><i class="fas fa-credit-card me-1"></i>BANK / ATM ACCOUNT NUMBER</label>
+                            <input type="text" name="atm_account_no" class="form-control border-primary" placeholder="e.g. 1234-5678-90 (Landbank / LBP)">
+                            <div class="form-text small">Required for direct payroll bank deposit.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-bold">CONTACT NUMBER (OPTIONAL)</label>
                             <input type="text" name="contact_number" class="form-control" placeholder="09XX-XXX-XXXX">
                         </div>
                         <div class="col-12 mt-4 text-end">

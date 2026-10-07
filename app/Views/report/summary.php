@@ -6,15 +6,16 @@
         $reportLabels = [
             'office' => 'Office-wise Summary',
             'period' => 'Monthly Payroll Record',
+            'quarterly' => 'Quarterly Report (3 Months)',
+            'annual' => 'Annual Report (12 Months)',
             'deductions' => 'Deduction Analysis'
         ];
-        $reportLabel = $reportLabels[$report_type] ?? 'Payroll Summary Report';
-        $periodFormatted = date('F Y', strtotime($period . '-01'));
+        $displayTitle = $report_title ?? ($reportLabels[$report_type] ?? 'Payroll Summary Report');
     ?>
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h5 class="fw-bold mb-0"><i class="fas fa-table me-2"></i><?= esc($reportLabel) ?></h5>
-            <p class="text-muted small mb-0">Period: <strong><?= esc($periodFormatted) ?></strong> | Office: <strong><?= esc($office_name) ?></strong></p>
+            <h5 class="fw-bold mb-0"><i class="fas fa-chart-bar text-primary me-2"></i><?= esc($displayTitle) ?></h5>
+            <p class="text-muted small mb-0">Office Scope: <strong><?= esc($office_name) ?></strong> | Generated: <strong><?= date('F d, Y') ?></strong></p>
         </div>
         <button onclick="window.print()" class="btn btn-outline-dark btn-sm"><i class="fas fa-print me-2"></i>Print Report</button>
     </div>

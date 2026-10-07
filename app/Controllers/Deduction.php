@@ -146,50 +146,81 @@ public function update()
 }
 
     public function index()
-{
-    $empModel    = new EmployeeModel();
-    $officeModel = new \App\Models\OfficeModel();
+    {
+        $empModel    = new EmployeeModel();
+        $officeModel = new \App\Models\OfficeModel();
 
-    $keyword  = $this->request->getVar('search');
-    $officeId = $this->request->getVar('office_id');
-    $period   = date('Y-m');
+        $keyword    = $this->request->getVar('search');
+        $officeId   = $this->request->getVar('office_id');
+        $bankFilter = $this->request->getVar('bank_filter');
+        $gsisFilter = $this->request->getVar('gsis_filter');
+        $period     = date('Y-m');
 
-    $data['offices'] = $officeModel->findAll();
+        $data['offices'] = $officeModel->findAll();
 
-    if (!$officeId && !empty($data['offices'])) {
-        foreach ($data['offices'] as $office) {
-            if (stripos($office['office_name'], 'MAYOR') !== false) {
-                $officeId = $office['id'];
-                break;
+        if (!$officeId && !empty($data['offices'])) {
+            foreach ($data['offices'] as $office) {
+                if (stripos($office['office_name'], 'MAYOR') !== false) {
+                    $officeId = $office['id'];
+                    break;
+                }
             }
         }
+
+        $empModel->select('employees.*, offices.office_name,
+                            deductions.gsis_premium, deductions.gsis_policy, deductions.gsis_other,
+                            deductions.gsis_ouli, deductions.gsis_diff,
+                            deductions.pagibig_premium, deductions.pagibig_loan, deductions.pagibig_mp2,
+                            deductions.phic, deductions.phic_diff, deductions.withholding_tax,
+                            deductions.loans, deductions.government_cont, deductions.other_deduct,
+                            deductions.bank_lbp, deductions.bank_other_payables, deductions.bank_mcc,
+                            deductions.bank_1stvb, deductions.bank_rbt,
+                            payroll_records.id as payroll_id, payroll_records.refund_rata,
+                            payroll_records.net_pay, payroll_records.first_quincena, payroll_records.second_quincena')
+                 ->join('offices', 'offices.id = employees.office_id', 'left')
+                 ->join('deductions', 'deductions.employee_id = employees.id', 'left')
+                 ->join('payroll_records', "payroll_records.employee_id = employees.id AND payroll_records.payroll_period = '{$period}'", 'left');
+
+        if ($officeId) $empModel->where('employees.office_id', $officeId);
+        if ($keyword)  $empModel->groupStart()
+                                 ->like('employees.full_name', $keyword)
+                                 ->orLike('employees.employee_id', $keyword)
+                                 ->groupEnd();
+
+        if ($bankFilter) {
+            if ($bankFilter === 'lbp') {
+                $empModel->where('deductions.bank_lbp >', 0);
+            } elseif ($bankFilter === 'mcc') {
+                $empModel->where('deductions.bank_mcc >', 0);
+            } elseif ($bankFilter === '1stvb') {
+                $empModel->where('deductions.bank_1stvb >', 0);
+            } elseif ($bankFilter === 'rbt') {
+                $empModel->where('deductions.bank_rbt >', 0);
+            } elseif ($bankFilter === 'other') {
+                $empModel->where('deductions.bank_other_payables >', 0);
+            }
+        }
+
+        if ($gsisFilter) {
+            if ($gsisFilter === 'premium') {
+                $empModel->where('deductions.gsis_premium >', 0);
+            } elseif ($gsisFilter === 'policy') {
+                $empModel->where('deductions.gsis_policy >', 0);
+            } elseif ($gsisFilter === 'other') {
+                $empModel->where('deductions.gsis_other >', 0);
+            } elseif ($gsisFilter === 'ouli') {
+                $empModel->where('deductions.gsis_ouli >', 0);
+            } elseif ($gsisFilter === 'diff') {
+                $empModel->where('deductions.gsis_diff >', 0);
+            }
+        }
+
+        $data['records']     = $empModel->orderBy('employees.id', 'ASC')->findAll();
+        $data['search']      = $keyword;
+        $data['office_id']   = $officeId;
+        $data['bank_filter'] = $bankFilter;
+        $data['gsis_filter'] = $gsisFilter;
+
+        return view('deduction/index', $data);
     }
-
-    $empModel->select('employees.*, offices.office_name,
-                        deductions.gsis_premium, deductions.gsis_policy, deductions.gsis_other,
-                        deductions.gsis_ouli, deductions.gsis_diff,
-                        deductions.pagibig_premium, deductions.pagibig_loan, deductions.pagibig_mp2,
-                        deductions.phic, deductions.phic_diff, deductions.withholding_tax,
-                        deductions.loans, deductions.government_cont, deductions.other_deduct,
-                        deductions.bank_lbp, deductions.bank_other_payables, deductions.bank_mcc,
-                        deductions.bank_1stvb, deductions.bank_rbt,
-                        payroll_records.id as payroll_id, payroll_records.refund_rata,
-                        payroll_records.net_pay, payroll_records.first_quincena, payroll_records.second_quincena')
-             ->join('offices', 'offices.id = employees.office_id', 'left')
-             ->join('deductions', 'deductions.employee_id = employees.id', 'left')
-             ->join('payroll_records', "payroll_records.employee_id = employees.id AND payroll_records.payroll_period = '{$period}'", 'left');
-
-    if ($officeId) $empModel->where('employees.office_id', $officeId);
-    if ($keyword)  $empModel->groupStart()
-                             ->like('employees.full_name', $keyword)
-                             ->orLike('employees.employee_id', $keyword)
-                             ->groupEnd();
-
-    $data['records']   = $empModel->orderBy('employees.id', 'ASC')->findAll();
-    $data['offices']   = $officeModel->findAll();
-    $data['search']    = $keyword;
-    $data['office_id'] = $officeId;
-
-    return view('deduction/index', $data);
-}
 }

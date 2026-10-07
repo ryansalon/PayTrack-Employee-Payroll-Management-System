@@ -32,8 +32,19 @@
                             <input type="hidden" name="office_id" id="office_id" value="<?= $employee['office_id'] ?>">
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label text-primary small fw-bold"><i class="fas fa-credit-card me-1"></i>BANK / ATM ACCOUNT NUMBER</label>
+                            <input type="text" name="atm_account_no" class="form-control border-primary" value="<?= esc($employee['atm_account_no'] ?? '') ?>" placeholder="e.g. 1234-5678-90 (Landbank / LBP)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-bold">EMPLOYMENT STATUS</label>
+                            <select name="employment_status" class="form-select">
+                                <option value="Regular" <?= ($employee['employment_status'] ?? '') === 'Regular' ? 'selected' : '' ?>>Regular / Plantilla</option>
+                                <option value="Job Order" <?= ($employee['employment_status'] ?? '') === 'Job Order' ? 'selected' : '' ?>>Job Order (J.O.)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label text-muted small fw-bold">CONTACT NUMBER</label>
-                            <input type="text" name="contact_number" class="form-control" value="<?= $employee['contact_number'] ?? '' ?>">
+                            <input type="text" name="contact_number" class="form-control" value="<?= esc($employee['contact_number'] ?? '') ?>">
                         </div>
                         <div class="col-12 mt-4 text-end">
                             <button type="button" class="btn btn-outline-danger btn-sm float-start px-3" onclick="confirmDelete()">Deactivate Employee</button>

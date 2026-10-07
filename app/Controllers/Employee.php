@@ -121,6 +121,20 @@ public function create()
     return view('employee/create', $data);
 }
 
+public function createJo()
+{
+    $officeModel = new OfficeModel();
+    $model = new EmployeeModel();
+
+    $year = date('Y');
+    $count = $model->like('employee_id', "JO-{$year}-", 'after')->countAllResults();
+    $nextNumber = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+    $data['generated_id'] = "JO-{$year}-{$nextNumber}";
+
+    $data['offices'] = $officeModel->getOfficesOrdered(true);
+    return view('employee/create_jo', $data);
+}
+
 public function edit($id)
 {
     $model = new EmployeeModel();

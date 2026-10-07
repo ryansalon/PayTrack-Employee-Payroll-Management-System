@@ -197,30 +197,70 @@
                             <!-- GSIS -->
                             <div class="col-12">
                                 <div class="deduction-section">
-                                    <div class="deduction-section-header">
-                                        <span class="deduction-section-icon"><i class="fas fa-shield-alt"></i></span>
-                                        <p class="deduction-section-title">GSIS</p>
+                                    <div class="deduction-section-header justify-content-between">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="deduction-section-icon"><i class="fas fa-shield-alt"></i></span>
+                                            <p class="deduction-section-title">GSIS Deductions & Share</p>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="autoCalculateGSIS()">
+                                            <i class="fas fa-magic me-1"></i> Auto-Calculate GSIS (PS 9%, GS 12%, EC ₱100)
+                                        </button>
                                     </div>
                                     <div class="row g-3">
+                                        <!-- Employee Share PS 9% -->
                                         <div class="col-md-4">
-                                            <label class="form-label deduction-label small">PREMIUM (PERSONAL)</label>
+                                            <label class="form-label deduction-label small">GSIS PS - PERSONAL PREMIUM (9%)</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
-                                                <input type="text" inputmode="decimal" name="gsis_premium" class="form-control deduction-input money-format" value="<?= number_format($deductions['gsis_premium'] ?? 0, 2) ?>">
+                                                <input type="text" inputmode="decimal" id="gsis_premium" name="gsis_premium" class="form-control deduction-input money-format" value="<?= number_format($deductions['gsis_premium'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
+                                        <!-- Employer Share GS 12% (Preview) -->
                                         <div class="col-md-4">
-                                            <label class="form-label deduction-label small">CONSO POLICY / MPL</label>
+                                            <label class="form-label text-muted small fw-bold">GSIS GS - GOV'T SHARE (12% Preview)</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-light text-muted">₱</span>
+                                                <input type="text" id="gsis_gs_display" class="form-control bg-light text-muted" readonly value="0.00">
+                                            </div>
+                                            <div class="form-text x-small">Appears on printed reports, not deducted from net pay.</div>
+                                        </div>
+                                        <!-- Employer EC 100 fixed -->
+                                        <div class="col-md-4">
+                                            <label class="form-label text-muted small fw-bold">GSIS EC - EMPLOYEES' COMP (₱100 Fixed)</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-light text-muted">₱</span>
+                                                <input type="text" id="gsis_ec_display" class="form-control bg-light text-muted" readonly value="100.00">
+                                            </div>
+                                            <div class="form-text x-small">Fixed amount paid by LGU/Employer.</div>
+                                        </div>
+
+                                        <!-- Separated GSIS Loans -->
+                                        <div class="col-md-4">
+                                            <label class="form-label deduction-label small">GSIS CONSO LOAN / POLICY</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="gsis_policy" class="form-control deduction-input money-format" value="<?= number_format($deductions['gsis_policy'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label deduction-label small">GFAL / EMRGYLN / MPL LITE / CPL</label>
+                                            <label class="form-label deduction-label small">GSIS EMERGENCY / GFAL / MPL</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="gsis_other" class="form-control deduction-input money-format" value="<?= number_format($deductions['gsis_other'] ?? 0, 2) ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label deduction-label small">GSIS OULI</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text deduction-prefix">₱</span>
+                                                <input type="text" inputmode="decimal" name="gsis_ouli" class="form-control deduction-input money-format" value="<?= number_format($deductions['gsis_ouli'] ?? 0, 2) ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label deduction-label small">GSIS DIFFERENTIAL (DIFF-GSIS)</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text deduction-prefix">₱</span>
+                                                <input type="text" inputmode="decimal" name="gsis_diff" class="form-control deduction-input money-format" value="<?= number_format($deductions['gsis_diff'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -357,7 +397,35 @@ function addCommas(raw) {
     return decPart !== undefined ? `${intPart}.${decPart}` : intPart;
 }
 
+function autoCalculateGSIS() {
+    const monthlyRate = parseFloat(unformatMoney(document.getElementById('salary_rate').value)) || 0;
+    const ps9 = Math.round((monthlyRate * 0.09) * 100) / 100;
+    const gs12 = Math.round((monthlyRate * 0.12) * 100) / 100;
+
+    const premiumInput = document.getElementById('gsis_premium');
+    if (premiumInput) {
+        premiumInput.value = addCommas(ps9.toFixed(2));
+    }
+    
+    const gsDisplay = document.getElementById('gsis_gs_display');
+    if (gsDisplay) {
+        gsDisplay.value = addCommas(gs12.toFixed(2));
+    }
+
+    recalcNetPay();
+}
+
+function updateEmployerShares() {
+    const monthlyRate = parseFloat(unformatMoney(document.getElementById('salary_rate').value)) || 0;
+    const gs12 = Math.round((monthlyRate * 0.12) * 100) / 100;
+    const gsDisplay = document.getElementById('gsis_gs_display');
+    if (gsDisplay) {
+        gsDisplay.value = addCommas(gs12.toFixed(2));
+    }
+}
+
 function recalcNetPay() {
+    updateEmployerShares();
     const monthlyRate = parseFloat(unformatMoney(document.getElementById('salary_rate').value)) || 0;
     let totalDeductions = 0;
     document.querySelectorAll('.deduction-input:not(#salary_rate)').forEach(input => {

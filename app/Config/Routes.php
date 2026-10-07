@@ -19,6 +19,7 @@ $routes->get('dashboard', 'Dashboard::index', ['filter' => 'auth']);
 $routes->group('employee', ['filter' => 'auth'], function($routes) {
     $routes->get('/', 'Employee::index');
     $routes->get('create', 'Employee::create');
+    $routes->get('create-jo', 'Employee::createJo');
     $routes->post('store', 'Employee::store');
     $routes->get('edit/(:num)', 'Employee::edit/$1');
     $routes->post('update/(:num)', 'Employee::update/$1');

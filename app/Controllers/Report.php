@@ -29,15 +29,68 @@ class Report extends BaseController
         $payrollModel = new PayrollModel();
         $officeModel = new OfficeModel();
 
-        $type = $this->request->getVar('report_type') ?? 'period';
-        $period = $this->request->getVar('period') ?? date('Y-m');
+        $type     = $this->request->getVar('report_type') ?? 'period';
+        $period   = $this->request->getVar('period') ?? date('Y-m');
+        $quarter  = $this->request->getVar('quarter') ?? 'Q1';
+        $year     = $this->request->getVar('year') ?? date('Y');
         $officeId = $this->request->getVar('office_id') ?? 'all';
 
         $data['report_type'] = $type;
-        $data['period'] = $period;
-        $data['office_id'] = $officeId;
+        $data['period']      = $period;
+        $data['quarter']     = $quarter;
+        $data['year']        = $year;
+        $data['office_id']   = $officeId;
 
-        if ($type === 'office') {
+        if ($type === 'quarterly') {
+            $quarterMonths = [
+                'Q1' => ["{$year}-01", "{$year}-02", "{$year}-03"],
+                'Q2' => ["{$year}-04", "{$year}-05", "{$year}-06"],
+                'Q3' => ["{$year}-07", "{$year}-08", "{$year}-09"],
+                'Q4' => ["{$year}-10", "{$year}-11", "{$year}-12"],
+            ];
+            $periods = $quarterMonths[$quarter] ?? $quarterMonths['Q1'];
+
+            $query = $payrollModel->select('payroll_records.*, employees.full_name, employees.position, employees.employee_id as emp_code, offices.office_name, deductions.*')
+                ->join('employees', 'employees.id = payroll_records.employee_id')
+                ->join('offices', 'offices.id = employees.office_id')
+                ->join('deductions', 'deductions.employee_id = employees.id', 'left')
+                ->whereIn('payroll_records.payroll_period', $periods);
+
+            if ($officeId !== 'all') {
+                $query->where('employees.office_id', $officeId);
+                $office = $officeModel->find($officeId);
+                $data['office_name'] = $office['office_name'] ?? 'Unknown';
+            } else {
+                $data['office_name'] = 'All Offices';
+            }
+
+            $data['results']      = $query->findAll();
+            $data['report_title'] = "Quarterly Payroll Summary ({$quarter} {$year})";
+
+        } elseif ($type === 'annual') {
+            $periods = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $periods[] = sprintf("%s-%02d", $year, $m);
+            }
+
+            $query = $payrollModel->select('payroll_records.*, employees.full_name, employees.position, employees.employee_id as emp_code, offices.office_name, deductions.*')
+                ->join('employees', 'employees.id = payroll_records.employee_id')
+                ->join('offices', 'offices.id = employees.office_id')
+                ->join('deductions', 'deductions.employee_id = employees.id', 'left')
+                ->whereIn('payroll_records.payroll_period', $periods);
+
+            if ($officeId !== 'all') {
+                $query->where('employees.office_id', $officeId);
+                $office = $officeModel->find($officeId);
+                $data['office_name'] = $office['office_name'] ?? 'Unknown';
+            } else {
+                $data['office_name'] = 'All Offices';
+            }
+
+            $data['results']      = $query->findAll();
+            $data['report_title'] = "Annual Payroll Summary ({$year})";
+
+        } elseif ($type === 'office') {
             $data['results'] = [];
             $offices = $officeModel->getOfficesOrdered();
             foreach ($offices as $office) {
@@ -67,7 +120,8 @@ class Report extends BaseController
                     ];
                 }
             }
-            $data['office_name'] = 'All Offices';
+            $data['office_name']  = 'All Offices';
+            $data['report_title'] = "Office-wise Payroll Summary (" . date('F Y', strtotime($period . '-01')) . ")";
         } elseif ($type === 'deductions') {
             $query = $payrollModel->select('payroll_records.*, employees.full_name, offices.office_name, deductions.*')
                 ->join('employees', 'employees.id = payroll_records.employee_id')
@@ -83,7 +137,8 @@ class Report extends BaseController
                 $data['office_name'] = 'All Offices';
             }
 
-            $data['results'] = $query->findAll();
+            $data['results']      = $query->findAll();
+            $data['report_title'] = "Deduction Analysis (" . date('F Y', strtotime($period . '-01')) . ")";
         } else {
             $query = $payrollModel->select('payroll_records.*, employees.full_name, employees.position, offices.office_name')
                 ->join('employees', 'employees.id = payroll_records.employee_id')
@@ -98,7 +153,8 @@ class Report extends BaseController
                 $data['office_name'] = 'All Offices';
             }
 
-            $data['results'] = $query->findAll();
+            $data['results']      = $query->findAll();
+            $data['report_title'] = "Monthly Payroll Record (" . date('F Y', strtotime($period . '-01')) . ")";
         }
 
         return view('report/summary', $data);

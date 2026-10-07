@@ -60,7 +60,8 @@ function peso($value) {
             <button type="button" class="btn btn-outline-danger btn-sm px-3" data-bs-toggle="modal" data-bs-target="#deleteAllModal">
                 <i class="fas fa-trash-alt"></i> Delete All
             </button>
-            <a href="/employee/create" class="btn btn-primary btn-sm px-3">+ Add New Employee</a>
+            <a href="/employee/create-jo" class="btn btn-warning btn-sm px-3 text-dark fw-bold"><i class="fas fa-user-tag me-1"></i>+ Add J.O. Employee</a>
+            <a href="/employee/create" class="btn btn-primary btn-sm px-3">+ Add Regular Employee</a>
         </div>
     </div>
 
@@ -77,7 +78,7 @@ function peso($value) {
             <div class="col-md-5">
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" name="search" class="form-control border-0" placeholder="Search ID or Name..." value="<?= esc($search ?? '') ?>">
+                    <input type="text" name="search" class="form-control border-0" placeholder="Search ID, Name, or Bank Acc..." value="<?= esc($search ?? '') ?>">
                 </div>
             </div>
         </form>
@@ -91,7 +92,8 @@ function peso($value) {
                     <th style="vertical-align: middle;">FULL NAME</th>
                     <th style="vertical-align: middle;">OFFICE</th>
                     <th style="vertical-align: middle;">DESIGNATION</th>
-                    <th style="vertical-align: middle;">CONTACT NUMBER</th>
+                    <th style="vertical-align: middle;"><i class="fas fa-credit-card text-primary me-1"></i>ATM / ACC NO.</th>
+                    <th style="vertical-align: middle;">CONTACT</th>
                     <th class="text-center" style="vertical-align: middle;">STATUS</th>
                     <th class="text-center" style="vertical-align: middle;">ACTIONS</th>
                 </tr>
@@ -100,11 +102,21 @@ function peso($value) {
                 <?php $no = 1; foreach($employees as $emp): ?>
                 <tr>
                     <td class="align-middle text-center" style="width: 40px;"><?= $no++ ?></td>
-                    <td class="align-middle fw-bold text-primary"><?= esc($emp['full_name']) ?></td>
+                    <td class="align-middle fw-bold text-primary">
+                        <?= esc($emp['full_name']) ?>
+                        <div class="small text-muted font-monospace"><?= esc($emp['employee_id']) ?></div>
+                    </td>
                     <td class="align-middle"><span class="text-muted small"><?= esc($emp['office_name'] ?? '—') ?></span></td>
                     <td class="align-middle"><span class="text-muted small"><?= esc($emp['position'] ?? '—') ?></span></td>
+                    <td class="align-middle"><span class="fw-bold text-dark small font-monospace"><?= esc($emp['atm_account_no'] ?? '—') ?></span></td>
                     <td class="align-middle"><span class="text-muted small"><?= esc($emp['contact_number'] ?? '—') ?></span></td>
-                    <td class="align-middle text-center"><span class="badge rounded-pill bg-success">Active</span></td>
+                    <td class="align-middle text-center">
+                        <?php if (($emp['employment_status'] ?? 'Regular') === 'Job Order'): ?>
+                            <span class="badge bg-warning text-dark fw-bold">J.O.</span>
+                        <?php else: ?>
+                            <span class="badge bg-success">Regular</span>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-center">
                         <a href="/employee/edit/<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary border-0"><i class="fas fa-edit"></i></a>
                         <a href="/deduction/manage/<?= $emp['id'] ?>" class="btn btn-sm btn-outline-info border-0"><i class="fas fa-file-invoice"></i></a>
