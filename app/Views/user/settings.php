@@ -9,6 +9,7 @@
                     <h5 class="fw-bold mb-4">Account Settings</h5>
                     
                     <form action="/user/update_password" method="post">
+                        <?= csrf_field() ?>
                         <div class="mb-4">
                             <label class="form-label text-muted small fw-bold">CURRENT PASSWORD</label>
                             <input type="password" name="old_password" class="form-control border-light shadow-sm">

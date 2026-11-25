@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?= csrf_hash() ?>">
+    <meta name="csrf-header" content="<?= csrf_header() ?>">
     <link rel="icon" type="image/x-icon" href="<?= base_url('favicon.ico') ?>">
     <title>PMS | Payroll Management System</title>
-    <!-- Google Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bundled Offline Assets (zero external CDN requests) -->
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/fontawesome/css/all.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap/bootstrap.min.css') ?>">
 
     <style>
         :root {
@@ -33,7 +33,7 @@
             --bs-primary-darker: #0b1f3a;
         }
 
-        body { font-family: 'IBM Plex Sans', sans-serif; background-color: var(--bg-light); color: var(--ink); }
+        body { font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif; background-color: var(--bg-light); color: var(--ink); }
 
         /* Sharp edges across the system */
         .card, .card-header, .card-footer, .btn, .form-control, .form-select,
@@ -159,7 +159,11 @@
             <a href="/deduction" class="nav-link <?= url_is('deduction*') ? 'active' : '' ?>"><i class="fas fa-sliders-h"></i> Deductions</a>
             <a href="/report" class="nav-link <?= url_is('report*') ? 'active' : '' ?>"><i class="fas fa-file-alt"></i> Reports</a>
             <hr class="mx-3">
-            <a href="/user" class="nav-link <?= url_is('user*') ? 'active' : '' ?>"><i class="fas fa-users-cog"></i> User Management</a>
+            <?php if (session()->get('role') === 'admin'): ?>
+                <a href="/settings" class="nav-link <?= url_is('settings*') ? 'active' : '' ?>"><i class="fas fa-landmark"></i> LGU Settings</a>
+                <a href="/backup" class="nav-link <?= url_is('backup*') ? 'active' : '' ?>"><i class="fas fa-database"></i> Backup &amp; Restore</a>
+                <a href="/user" class="nav-link <?= url_is('user') || url_is('user/register*') ? 'active' : '' ?>"><i class="fas fa-users-cog"></i> User Management</a>
+            <?php endif; ?>
             <a href="/auth/logout" class="nav-link text-danger mt-5"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
     </nav>
@@ -169,9 +173,9 @@
         <!-- Top Navbar -->
         <nav class="navbar navbar-expand-lg px-4 py-3 sticky-top">
             <div class="container-fluid">
-                <span class="navbar-text text-dark fw-medium">Welcome back, <?= session()->get('username') ?></span>
+                <span class="navbar-text text-dark fw-medium">Welcome back, <?= esc(session()->get('username')) ?></span>
                 <div class="ms-auto d-flex align-items-center">
-                    <a href="/user/settings" class="btn btn-light btn-sm p-2"><i class="fas fa-cog"></i></a>
+                    <a href="/user/settings" class="btn btn-light btn-sm p-2" title="Account Settings"><i class="fas fa-cog"></i></a>
                 </div>
             </div>
         </nav>
@@ -179,13 +183,13 @@
         <div class="p-4">
             <?php if (session()->getFlashdata('success')): ?>
                 <div class="alert alert-success alert-dismissible fade show mb-4 shadow-sm border-0" role="alert">
-                    <i class="fas fa-check-circle me-2"></i><?= session()->getFlashdata('success') ?>
+                    <i class="fas fa-check-circle me-2"></i><?= esc(session()->getFlashdata('success')) ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             <?php endif; ?>
             <?php if (session()->getFlashdata('error')): ?>
                 <div class="alert alert-danger alert-dismissible fade show mb-4 shadow-sm border-0" role="alert">
-                    <i class="fas fa-exclamation-triangle me-2"></i><?= session()->getFlashdata('error') ?>
+                    <i class="fas fa-exclamation-triangle me-2"></i><?= esc(session()->getFlashdata('error')) ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             <?php endif; ?>
@@ -194,7 +198,7 @@
                     <i class="fas fa-exclamation-triangle me-2"></i>
                     <?php 
                         $errs = session()->getFlashdata('errors');
-                        echo is_array($errs) ? implode('<br>', $errs) : $errs;
+                        echo is_array($errs) ? implode('<br>', array_map('esc', $errs)) : esc($errs);
                     ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
@@ -204,6 +208,6 @@
     </main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="<?= base_url('assets/vendor/bootstrap/bootstrap.bundle.min.js') ?>"></script>
 </body>
 </html>

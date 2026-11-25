@@ -18,15 +18,14 @@
                         <i class="fas fa-user-shield fa-lg"></i>
                     </div>
                     <div>
-                        <h6 class="fw-bold mb-0"><?= $user['name'] ?></h6>
-                        <small class="text-muted">@<?= $user['username'] ?></small>
+                        <h6 class="fw-bold mb-0"><?= esc($user['name']) ?></h6>
+                        <small class="text-muted">@<?= esc($user['username']) ?></small>
                     </div>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="badge <?= $user['role'] == 'admin' ? 'bg-danger' : 'bg-primary' ?> rounded-pill px-3">
-                        <?= strtoupper($user['role']) ?>
+                        <?= esc(strtoupper($user['role'])) ?>
                     </span>
-                    <a href="#" class="text-muted small text-decoration-none">Edit Permissions</a>
                 </div>
             </div>
         </div>
@@ -38,6 +37,7 @@
 <div class="modal fade" id="addUserModal" tabindex="-1">
     <div class="modal-dialog">
         <form class="modal-content border-0 shadow" action="/user/register" method="post">
+            <?= csrf_field() ?>
             <div class="modal-header border-0 pb-0">
                 <h5 class="fw-bold">New User Registration</h5>
             </div>

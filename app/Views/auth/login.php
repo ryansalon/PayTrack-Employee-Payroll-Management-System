@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="<?= base_url('favicon.ico') ?>">
     <title>Sign In | Payroll Management System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --navy: #0f2a4a;
@@ -330,10 +329,11 @@
             </div>
 
             <div class="login-alert" id="loginAlert">
-                <span><?= session()->getFlashdata('error') ?></span>
+                <span><?= esc(session()->getFlashdata('error')) ?></span>
             </div>
 
             <form action="<?= base_url('auth/authenticate') ?>" method="post" novalidate>
+                <?= csrf_field() ?>
                 <div class="form-group">
                     <label class="form-label" for="username">Username</label>
                     <input type="text" class="form-control" id="username" name="username" placeholder="Enter your username" required autofocus>

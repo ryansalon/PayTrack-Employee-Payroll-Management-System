@@ -17,6 +17,10 @@ class User extends BaseController
 
     public function register()
     {
+        if (session()->get('role') !== 'admin') {
+            return redirect()->to('/dashboard')->with('error', 'Administrator access is required.');
+        }
+
         $model = new UserModel();
         
         $data = [

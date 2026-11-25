@@ -23,7 +23,8 @@ $routes->group('employee', ['filter' => 'auth'], function($routes) {
     $routes->post('store', 'Employee::store');
     $routes->get('edit/(:num)', 'Employee::edit/$1');
     $routes->post('update/(:num)', 'Employee::update/$1');
-    $routes->get('delete/(:num)', 'Employee::delete/$1');
+    $routes->post('delete/(:num)', 'Employee::delete/$1');
+    $routes->post('reactivate/(:num)', 'Employee::reactivate/$1');
     $routes->post('deleteAll', 'Employee::deleteAll');
     $routes->post('import', 'Employee::import');
 });
@@ -46,7 +47,10 @@ $routes->group('payroll', ['filter' => 'auth'], function($routes) {
     $routes->get('/', 'Payroll::index');
     $routes->get('export', 'Payroll::export');
     $routes->get('print', 'Payroll::printAll');
-    $routes->match(['get', 'post'], 'process/(:num)', 'Payroll::process/$1');
+    $routes->post('process/(:num)', 'Payroll::process/$1');
+    $routes->post('process-batch', 'Payroll::processBatch');
+    $routes->post('lock', 'Payroll::lock');
+    $routes->post('unlock', 'Payroll::unlock');
 });
 
 // Payslip Generation
@@ -61,6 +65,19 @@ $routes->group('payslip', ['filter' => 'auth'], function($routes) {
 $routes->group('report', ['filter' => 'auth'], function($routes) {
     $routes->get('/', 'Report::index');
     $routes->get('generate', 'Report::generate');
+});
+
+// LGU Settings (Admin Only)
+$routes->group('settings', ['filter' => 'auth'], function($routes) {
+    $routes->get('/', 'Settings::index');
+    $routes->post('update', 'Settings::update');
+});
+
+// Database Backup & Restore (Admin Only)
+$routes->group('backup', ['filter' => 'auth'], function($routes) {
+    $routes->get('/', 'Backup::index');
+    $routes->post('download', 'Backup::download');
+    $routes->post('restore', 'Backup::restore');
 });
 
 // User Management (Admin Only)
