@@ -2,164 +2,207 @@
 
 namespace App\Controllers;
 
+use App\Libraries\PayrollCalculator;
 use App\Models\DeductionModel;
 use App\Models\EmployeeModel;
+use App\Models\OfficeModel;
+use App\Models\PayrollModel;
+use App\Models\PayrollPeriodModel;
 
 class Deduction extends BaseController
 {
-public function manage($employee_id)
-{
-    $empModel = new EmployeeModel();
-    $deductModel = new DeductionModel();
-    $payrollModel = new \App\Models\PayrollModel();
+    public function manage($employee_id)
+    {
+        $empModel     = new EmployeeModel();
+        $deductModel  = new DeductionModel();
+        $payrollModel = new PayrollModel();
+        $periodModel  = new PayrollPeriodModel();
 
-    $data['employee'] = $empModel->select('employees.*, offices.office_name')
-                                  ->join('offices', 'offices.id = employees.office_id', 'left')
-                                  ->find($employee_id);
-    $data['deductions'] = $deductModel->where('employee_id', $employee_id)->first();
+        $period = PayrollCalculator::sanitizePeriod($this->request->getVar('period'));
+        $isLocked = $periodModel->isLocked($period);
+        $isPastUnlocked = (!$isLocked && $period < date('Y-m'));
 
-    // Pull the latest payroll record just to prefill the refund/rata amount
-    $latestPayroll = $payrollModel->where('employee_id', $employee_id)
-                                   ->orderBy('id', 'DESC')
-                                   ->first();
-    $data['refund_rata'] = $latestPayroll['refund_rata'] ?? 0;
+        $employee = $empModel->select('employees.*, offices.office_name')
+                             ->join('offices', 'offices.id = employees.office_id', 'left')
+                             ->find($employee_id);
+        if (!$employee) {
+            return redirect()->to('/deduction?period=' . $period)->with('error', 'Employee not found.');
+        }
 
-    return view('deduction/manage', $data);
-}
+        $periodPayroll = $payrollModel->where('employee_id', $employee_id)
+                                      ->where('payroll_period', $period)
+                                      ->first();
+        $standingDeduct = $deductModel->where('employee_id', $employee_id)->first() ?? [];
 
-// NEW
-public function update()
-{
-    $model = new DeductionModel();
-    $emp_id = $this->request->getVar('employee_id');
+        if ($isPastUnlocked && $periodPayroll) {
+            $deductions = PayrollCalculator::extractSnapshot($periodPayroll, $standingDeduct);
+            $salaryRate = $periodPayroll['salary_rate_snapshot'] !== null
+                ? (float) $periodPayroll['salary_rate_snapshot']
+                : max(0.0, round((float) $periodPayroll['gross_pay'] - (float) ($periodPayroll['refund_rata'] ?? 0), 2));
+            $atmAccount = $periodPayroll['atm_account_no_snapshot'] ?? ($employee['atm_account_no'] ?? '');
+            $refundRata = (float) ($periodPayroll['refund_rata'] ?? 0);
+        } else {
+            $deductions = PayrollCalculator::normalizeDeductions($standingDeduct);
+            $salaryRate = (float) ($employee['salary_rate'] ?? 0);
+            $atmAccount = (string) ($employee['atm_account_no'] ?? '');
+            $refundRata = (float) ($periodPayroll['refund_rata'] ?? 0);
+        }
 
-    $data = [
-        'withholding_tax'  => $this->request->getVar('tax'),
-        'loans'            => $this->request->getVar('loans'),
-        'government_cont'  => $this->request->getVar('gov'),
-        'other_deduct'     => $this->request->getVar('others'),
-        'gsis_premium'     => $this->request->getVar('gsis_premium'),
-        'gsis_policy'      => $this->request->getVar('gsis_policy'),
-        'gsis_other'       => $this->request->getVar('gsis_other'),
-        'gsis_ouli'        => $this->request->getVar('gsis_ouli'),          // NEW
-        'gsis_diff'        => $this->request->getVar('gsis_diff'),          // NEW
-        'pagibig_premium'  => $this->request->getVar('pagibig_premium'),
-        'pagibig_loan'     => $this->request->getVar('pagibig_loan'),
-        'pagibig_mp2'      => $this->request->getVar('pagibig_mp2'),        // NEW
-        'phic'             => $this->request->getVar('phic'),
-        'phic_diff'        => $this->request->getVar('phic_diff'),         // NEW
-        'bank_lbp'         => $this->request->getVar('bank_lbp'),
-        'bank_other_payables' => $this->request->getVar('bank_other_payables'), // NEW
-        'bank_mcc'         => $this->request->getVar('bank_mcc'),
-        'bank_1stvb'       => $this->request->getVar('bank_1stvb'),
-        'bank_rbt'         => $this->request->getVar('bank_rbt'),           // NEW
-    ];
-
-    // Handle case where no deduction row exists yet for this employee
-    $existing = $model->where('employee_id', $emp_id)->first();
-    if ($existing) {
-        $model->where('employee_id', $emp_id)->set($data)->update();
-    } else {
-        $data['employee_id'] = $emp_id;
-        $model->insert($data);
+        return view('deduction/manage', [
+            'employee'         => $employee,
+            'deductions'       => $deductions,
+            'salary_rate'      => $salaryRate,
+            'atm_account_no'   => $atmAccount,
+            'refund_rata'      => $refundRata,
+            'period'           => $period,
+            'period_label'     => PayrollCalculator::formatPeriodLabel($period),
+            'is_locked'        => $isLocked,
+            'is_past_unlocked' => $isPastUnlocked,
+        ]);
     }
 
-    // Save Monthly Rate back to the employees table
-    // (the manage.php form's salary_rate field posts here, but was never persisted)
-    $empModel = new \App\Models\EmployeeModel();
-    $salary_rate = $this->request->getVar('salary_rate');
-    if ($salary_rate !== null && $salary_rate !== '') {
-        $empModel->update($emp_id, ['salary_rate' => (float) $salary_rate]);
+    public function update()
+    {
+        $deductModel  = new DeductionModel();
+        $empModel     = new EmployeeModel();
+        $payrollModel = new PayrollModel();
+        $periodModel  = new PayrollPeriodModel();
+        $officeModel  = new OfficeModel();
+
+        $empId  = (int) $this->request->getPost('employee_id');
+        $period = PayrollCalculator::sanitizePeriod($this->request->getPost('period'));
+
+        $emp = $empModel->find($empId);
+        if (!$emp) {
+            return redirect()->to('/payroll?period=' . $period)->with('error', 'Employee not found.');
+        }
+
+        $deductionData = PayrollCalculator::normalizeDeductions([
+            'withholding_tax'     => $this->request->getPost('tax'),
+            'loans'               => $this->request->getPost('loans'),
+            'government_cont'     => $this->request->getPost('gov'),
+            'other_deduct'        => $this->request->getPost('others'),
+            'gsis_premium'        => $this->request->getPost('gsis_premium'),
+            'gsis_policy'         => $this->request->getPost('gsis_policy'),
+            'gsis_other'          => $this->request->getPost('gsis_other'),
+            'gsis_ouli'           => $this->request->getPost('gsis_ouli'),
+            'gsis_diff'           => $this->request->getPost('gsis_diff'),
+            'pagibig_premium'     => $this->request->getPost('pagibig_premium'),
+            'pagibig_loan'        => $this->request->getPost('pagibig_loan'),
+            'pagibig_mp2'         => $this->request->getPost('pagibig_mp2'),
+            'phic'                => $this->request->getPost('phic'),
+            'phic_diff'           => $this->request->getPost('phic_diff'),
+            'bank_lbp'            => $this->request->getPost('bank_lbp'),
+            'bank_other_payables' => $this->request->getPost('bank_other_payables'),
+            'bank_mcc'            => $this->request->getPost('bank_mcc'),
+            'bank_1stvb'          => $this->request->getPost('bank_1stvb'),
+            'bank_rbt'            => $this->request->getPost('bank_rbt'),
+        ]);
+
+        $salaryInput = $this->request->getPost('salary_rate');
+        $salaryRate  = ($salaryInput !== null && $salaryInput !== '')
+            ? PayrollCalculator::toMoney($salaryInput)
+            : (float) ($emp['salary_rate'] ?? 0);
+
+        $atmInput   = $this->request->getPost('atm_account_no');
+        $atmAccount = $atmInput !== null ? trim((string) $atmInput) : (string) ($emp['atm_account_no'] ?? '');
+
+        $isLocked       = $periodModel->isLocked($period);
+        $isPastUnlocked = (!$isLocked && $period < date('Y-m'));
+
+        // Case 1 & 3 (locked or current/future draft): update standing deductions & employee master fields
+        if (!$isPastUnlocked) {
+            $existingDeduct = $deductModel->where('employee_id', $empId)->first();
+            if ($existingDeduct) {
+                $deductModel->update($existingDeduct['id'], $deductionData);
+            } else {
+                $deductModel->insert(array_merge($deductionData, ['employee_id' => $empId]));
+            }
+
+            $empModel->skipValidation(true)->update($empId, [
+                'salary_rate'    => $salaryRate,
+                'atm_account_no' => $atmAccount !== '' ? $atmAccount : null,
+            ]);
+        }
+
+        // Case 1 (locked period): do not touch the locked period's payroll_records row
+        if ($isLocked) {
+            return redirect()->to('/payroll?period=' . $period)->with(
+                'success',
+                "Standing deductions updated for {$emp['full_name']}. Locked period {$period} was left unchanged."
+            );
+        }
+
+        // Case 2 (past unlocked) & Case 3 (current/future draft): upsert this period's payroll record & snapshot
+        $refundRata = PayrollCalculator::toMoney($this->request->getPost('refund_rata') ?? 0);
+        $existingPayroll = $payrollModel->where('employee_id', $empId)
+                                        ->where('payroll_period', $period)
+                                        ->first();
+
+        $existingFirstQ = ($existingPayroll && isset($existingPayroll['first_quincena']) && (float) $existingPayroll['first_quincena'] > 0)
+            ? (float) $existingPayroll['first_quincena']
+            : null;
+
+        $calc = PayrollCalculator::computePayroll($salaryRate, $refundRata, $deductionData, $existingFirstQ);
+
+        $officeName = $existingPayroll['office_name_snapshot'] ?? null;
+        $officeId   = $existingPayroll['office_id_snapshot'] ?? ($emp['office_id'] ? (int) $emp['office_id'] : null);
+        if (!$officeName && $officeId) {
+            $office = $officeModel->find($officeId);
+            $officeName = $office['office_name'] ?? null;
+        }
+
+        $payrollData = [
+            'period_of_service'       => $existingPayroll['period_of_service'] ?? PayrollCalculator::periodDateRange($period),
+            'refund_rata'             => $calc['refund_rata'],
+            'gross_pay'               => $calc['gross_pay'],
+            'total_deductions'        => $calc['total_deductions'],
+            'net_pay'                 => $calc['net_pay'],
+            'first_quincena'          => $calc['first_quincena'],
+            'second_quincena'         => $calc['second_quincena'],
+            'cash_paid'               => $calc['cash_paid'],
+            'processed_by'            => session()->get('id') ?: null,
+            'deduction_snapshot'      => $calc['deduction_snapshot'],
+            'salary_rate_snapshot'    => $calc['salary_rate_snapshot'],
+            'employee_code_snapshot'  => $existingPayroll['employee_code_snapshot'] ?? $emp['employee_id'],
+            'full_name_snapshot'      => $existingPayroll['full_name_snapshot'] ?? $emp['full_name'],
+            'office_id_snapshot'      => $officeId,
+            'office_name_snapshot'    => $officeName,
+            'position_snapshot'       => $existingPayroll['position_snapshot'] ?? ($emp['position'] ?? ''),
+            'atm_account_no_snapshot' => $atmAccount !== '' ? $atmAccount : null,
+        ];
+
+        if ($existingPayroll) {
+            $payrollModel->update($existingPayroll['id'], $payrollData);
+        } else {
+            $payrollData['employee_id']    = $empId;
+            $payrollData['payroll_period'] = $period;
+            $payrollModel->insert($payrollData);
+        }
+
+        $msg = $isPastUnlocked
+            ? "Historical payroll updated for {$emp['full_name']} ({$period}). Standing rates were left unchanged."
+            : "Deductions updated for {$emp['full_name']}.";
+
+        return redirect()->to('/payroll?period=' . $period)->with('success', $msg);
     }
-
-    // NEW — persist the ATM/bank account number shown in the payroll's SIGNATURE column
-    $atm_account_no = $this->request->getVar('atm_account_no');
-    if ($atm_account_no !== null) {
-        $empModel->update($emp_id, ['atm_account_no' => $atm_account_no]);
-    }
-
-    // Recalculate & save the current period's payroll record so the Payroll list
-    // reflects the updated Monthly Rate and deductions right away, without
-    // needing to click "Process" again just to refresh the numbers.
-    $payrollModel = new \App\Models\PayrollModel();
-    $period = date('Y-m');
-    $refund_rata = (float) ($this->request->getVar('refund_rata') ?? 0);
-
-    $gross_pay = (float) ($salary_rate !== null && $salary_rate !== ''
-        ? $salary_rate
-        : ($empModel->find($emp_id)['salary_rate'] ?? 0));
-
-    $total_deductions =
-        (float) ($data['withholding_tax'] ?? 0) +
-        (float) ($data['loans'] ?? 0) +
-        (float) ($data['government_cont'] ?? 0) +
-        (float) ($data['other_deduct'] ?? 0) +
-        (float) ($data['gsis_premium'] ?? 0) +
-        (float) ($data['gsis_policy'] ?? 0) +
-        (float) ($data['gsis_other'] ?? 0) +
-        (float) ($data['gsis_ouli'] ?? 0) +           // NEW
-        (float) ($data['gsis_diff'] ?? 0) +            // NEW
-        (float) ($data['pagibig_premium'] ?? 0) +
-        (float) ($data['pagibig_loan'] ?? 0) +
-        (float) ($data['pagibig_mp2'] ?? 0) +           // NEW
-        (float) ($data['phic'] ?? 0) +
-        (float) ($data['phic_diff'] ?? 0) +             // NEW
-        (float) ($data['bank_lbp'] ?? 0) +
-        (float) ($data['bank_other_payables'] ?? 0) +   // NEW
-        (float) ($data['bank_mcc'] ?? 0) +
-        (float) ($data['bank_1stvb'] ?? 0) +
-        (float) ($data['bank_rbt'] ?? 0);               // NEW
-
-    $net_pay = ($gross_pay + $refund_rata) - $total_deductions;
-
-    $existingPayroll = $payrollModel->where('employee_id', $emp_id)
-                                     ->where('payroll_period', $period)
-                                     ->first();
-
-    if ($existingPayroll && isset($existingPayroll['first_quincena']) && (float)$existingPayroll['first_quincena'] > 0 && (float)$existingPayroll['first_quincena'] <= $net_pay) {
-        $first_quincena  = (float)$existingPayroll['first_quincena'];
-        $second_quincena = round($net_pay - $first_quincena, 2);
-    } else {
-        $first_quincena  = round($net_pay / 2, 2);
-        $second_quincena = round($net_pay - $first_quincena, 2);
-    }
-
-    $payrollData = [
-        'refund_rata'      => $refund_rata,
-        'gross_pay'        => $gross_pay,
-        'total_deductions' => $total_deductions,
-        'net_pay'          => $net_pay,
-        'first_quincena'   => $first_quincena,
-        'second_quincena'  => $second_quincena,
-        'cash_paid'        => $net_pay,
-    ];
-
-    if ($existingPayroll) {
-        $payrollModel->update($existingPayroll['id'], $payrollData);
-    } else {
-        $payrollData['employee_id']    = $emp_id;
-        $payrollData['payroll_period'] = $period;
-        $payrollModel->insert($payrollData);
-    }
-
-    return redirect()->to('/payroll')->with('success', 'Deductions updated.');
-}
 
     public function index()
     {
         $empModel    = new EmployeeModel();
-        $officeModel = new \App\Models\OfficeModel();
+        $officeModel = new OfficeModel();
+        $periodModel = new PayrollPeriodModel();
 
-        $keyword    = $this->request->getVar('search');
+        $keyword    = trim((string) $this->request->getVar('search'));
         $officeId   = $this->request->getVar('office_id');
         $bankFilter = $this->request->getVar('bank_filter');
         $gsisFilter = $this->request->getVar('gsis_filter');
-        $period     = date('Y-m');
+        $period     = PayrollCalculator::sanitizePeriod($this->request->getVar('period'));
+        $isLocked   = $periodModel->isLocked($period);
 
-        $data['offices'] = $officeModel->findAll();
-
-        if (!$officeId && !empty($data['offices'])) {
-            foreach ($data['offices'] as $office) {
+        $offices = $officeModel->getOfficesOrdered();
+        if ($officeId === null && !empty($offices)) {
+            foreach ($offices as $office) {
                 if (stripos($office['office_name'], 'MAYOR') !== false) {
                     $officeId = $office['id'];
                     break;
@@ -176,51 +219,98 @@ public function update()
                             deductions.bank_lbp, deductions.bank_other_payables, deductions.bank_mcc,
                             deductions.bank_1stvb, deductions.bank_rbt,
                             payroll_records.id as payroll_id, payroll_records.refund_rata,
-                            payroll_records.net_pay, payroll_records.first_quincena, payroll_records.second_quincena')
+                            payroll_records.gross_pay, payroll_records.total_deductions,
+                            payroll_records.net_pay, payroll_records.first_quincena, payroll_records.second_quincena,
+                            payroll_records.deduction_snapshot, payroll_records.salary_rate_snapshot,
+                            payroll_records.atm_account_no_snapshot')
                  ->join('offices', 'offices.id = employees.office_id', 'left')
                  ->join('deductions', 'deductions.employee_id = employees.id', 'left')
-                 ->join('payroll_records', "payroll_records.employee_id = employees.id AND payroll_records.payroll_period = '{$period}'", 'left');
+                 ->join('payroll_records', 'payroll_records.employee_id = employees.id AND payroll_records.payroll_period = ' . $empModel->db->escape($period), 'left');
 
-        if ($officeId) $empModel->where('employees.office_id', $officeId);
-        if ($keyword)  $empModel->groupStart()
-                                 ->like('employees.full_name', $keyword)
-                                 ->orLike('employees.employee_id', $keyword)
-                                 ->groupEnd();
-
-        if ($bankFilter) {
-            if ($bankFilter === 'lbp') {
-                $empModel->where('deductions.bank_lbp >', 0);
-            } elseif ($bankFilter === 'mcc') {
-                $empModel->where('deductions.bank_mcc >', 0);
-            } elseif ($bankFilter === '1stvb') {
-                $empModel->where('deductions.bank_1stvb >', 0);
-            } elseif ($bankFilter === 'rbt') {
-                $empModel->where('deductions.bank_rbt >', 0);
-            } elseif ($bankFilter === 'other') {
-                $empModel->where('deductions.bank_other_payables >', 0);
-            }
+        if ($isLocked) {
+            $empModel->where('payroll_records.id IS NOT NULL', null, false);
+        } else {
+            $empModel->groupStart()
+                     ->where('employees.is_active', 1)
+                     ->orWhere('payroll_records.id IS NOT NULL', null, false)
+                     ->groupEnd();
         }
 
-        if ($gsisFilter) {
-            if ($gsisFilter === 'premium') {
-                $empModel->where('deductions.gsis_premium >', 0);
-            } elseif ($gsisFilter === 'policy') {
-                $empModel->where('deductions.gsis_policy >', 0);
-            } elseif ($gsisFilter === 'other') {
-                $empModel->where('deductions.gsis_other >', 0);
-            } elseif ($gsisFilter === 'ouli') {
-                $empModel->where('deductions.gsis_ouli >', 0);
-            } elseif ($gsisFilter === 'diff') {
-                $empModel->where('deductions.gsis_diff >', 0);
-            }
+        if ($officeId) {
+            $empModel->where('employees.office_id', $officeId);
+        }
+        if ($keyword !== '') {
+            $empModel->groupStart()
+                     ->like('employees.full_name', $keyword)
+                     ->orLike('employees.employee_id', $keyword)
+                     ->groupEnd();
         }
 
-        $data['records']     = $empModel->orderBy('employees.id', 'ASC')->findAll();
-        $data['search']      = $keyword;
-        $data['office_id']   = $officeId;
-        $data['bank_filter'] = $bankFilter;
-        $data['gsis_filter'] = $gsisFilter;
+        $rawRows = $empModel->orderBy('employees.id', 'ASC')->findAll();
+        $records = [];
 
-        return view('deduction/index', $data);
+        foreach ($rawRows as $row) {
+            $deducts = !empty($row['payroll_id'])
+                ? PayrollCalculator::extractSnapshot($row)
+                : PayrollCalculator::normalizeDeductions($row);
+
+            if ($bankFilter) {
+                $bankMap = [
+                    'lbp'   => 'bank_lbp',
+                    'mcc'   => 'bank_mcc',
+                    '1stvb' => 'bank_1stvb',
+                    'rbt'   => 'bank_rbt',
+                    'other' => 'bank_other_payables',
+                ];
+                $col = $bankMap[$bankFilter] ?? null;
+                if ($col && ($deducts[$col] ?? 0) <= 0) {
+                    continue;
+                }
+            }
+            if ($gsisFilter) {
+                $gsisMap = [
+                    'premium' => 'gsis_premium',
+                    'policy'  => 'gsis_policy',
+                    'other'   => 'gsis_other',
+                    'ouli'    => 'gsis_ouli',
+                    'diff'    => 'gsis_diff',
+                ];
+                $col = $gsisMap[$gsisFilter] ?? null;
+                if ($col && ($deducts[$col] ?? 0) <= 0) {
+                    continue;
+                }
+            }
+
+            $salaryRate = ($row['salary_rate_snapshot'] !== null)
+                ? (float) $row['salary_rate_snapshot']
+                : (float) ($row['salary_rate'] ?? 0);
+            $refundRata = (float) ($row['refund_rata'] ?? 0);
+            $existingQ1 = ($row['first_quincena'] !== null && (float) $row['first_quincena'] > 0)
+                ? (float) $row['first_quincena']
+                : null;
+            $calc = PayrollCalculator::computePayroll($salaryRate, $refundRata, $deducts, $existingQ1, true);
+
+            $row['salary_rate_effective'] = $salaryRate;
+            $row['deductions_effective']  = $deducts;
+            $row['groups']                = PayrollCalculator::groupTotals($deducts);
+            $row['net_pay_effective']     = $calc['net_pay'];
+            $row['first_q_effective']     = $calc['first_quincena'];
+            $row['second_q_effective']    = $calc['second_quincena'];
+            $row['signature_display']     = PayrollCalculator::signatureValue($row);
+            $records[] = $row;
+        }
+
+        return view('deduction/index', [
+            'offices'        => $offices,
+            'records'        => $records,
+            'search'         => $keyword,
+            'office_id'      => $officeId,
+            'bank_filter'    => $bankFilter,
+            'gsis_filter'    => $gsisFilter,
+            'period'         => $period,
+            'period_label'   => PayrollCalculator::formatPeriodLabel($period),
+            'service_period' => PayrollCalculator::periodDateRange($period),
+            'is_locked'      => $isLocked,
+        ]);
     }
 }

@@ -7,6 +7,7 @@
             <div class="card border-0 shadow-sm p-4">
                 <h5 class="fw-bold mb-4">Register New Employee</h5>
                 <form action="/employee/store" method="post">
+                    <?= csrf_field() ?>
                     <div class="row g-3">
 <div class="col-md-6">
                             <label class="form-label text-muted small fw-bold">EMPLOYEE ID</label>
@@ -85,13 +86,19 @@
         bootstrap.Modal.getInstance(document.getElementById('officeModal')).hide();
     }
 
+function csrfHeaders(extra = {}) {
+        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const header = document.querySelector('meta[name="csrf-header"]')?.content || 'X-CSRF-TOKEN';
+        return Object.assign({ [header]: token }, extra);
+    }
+
 function addOffice() {
         const name = document.getElementById('new_office_name').value.trim();
         if (!name) return;
 
         fetch('/office/store', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: csrfHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
             body: 'office_name=' + encodeURIComponent(name)
         })
         .then(res => res.json())
@@ -117,7 +124,7 @@ function addOffice() {
     }
 
 function deleteOffice(id) {
-        fetch('/office/delete/' + id, { method: 'POST' })
+        fetch('/office/delete/' + id, { method: 'POST', headers: csrfHeaders() })
         .then(res => res.json())
         .then(data => {
             if (data.success) {

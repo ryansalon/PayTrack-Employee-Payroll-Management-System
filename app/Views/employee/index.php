@@ -51,15 +51,17 @@ function peso($value) {
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h4 class="fw-bold mb-1">Employee Records</h4>
-            <p class="text-muted small mb-0"><?= ($office_id ? ($offices[0]['office_name'] ?? '') : 'All Offices') ?> — <?= count($employees) ?> employee(s)</p>
+            <p class="text-muted small mb-0"><?= esc($selected_office_name ?? 'All Offices') ?> — <?= count($employees) ?> employee(s)</p>
         </div>
         <div class="d-flex gap-2">
             <button type="button" class="btn btn-outline-success btn-sm px-3" data-bs-toggle="modal" data-bs-target="#importModal">
                 <i class="fas fa-file-excel"></i> Import from Excel
             </button>
+            <?php if (session()->get('role') === 'admin'): ?>
             <button type="button" class="btn btn-outline-danger btn-sm px-3" data-bs-toggle="modal" data-bs-target="#deleteAllModal">
                 <i class="fas fa-trash-alt"></i> Delete All
             </button>
+            <?php endif; ?>
             <a href="/employee/create-jo" class="btn btn-warning btn-sm px-3 text-dark fw-bold"><i class="fas fa-user-tag me-1"></i>+ Add J.O. Employee</a>
             <a href="/employee/create" class="btn btn-primary btn-sm px-3">+ Add Regular Employee</a>
         </div>
@@ -71,8 +73,15 @@ function peso($value) {
                 <select name="office_id" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
                     <option value="">All Offices (Filter by Unit)</option>
                     <?php foreach($offices as $office): ?>
-                        <option value="<?= $office['id'] ?>" <?= (isset($office_id) && $office_id == $office['id']) ? 'selected' : '' ?>><?= $office['office_name'] ?></option>
+                        <option value="<?= $office['id'] ?>" <?= (isset($office_id) && $office_id == $office['id']) ? 'selected' : '' ?>><?= esc($office['office_name']) ?></option>
                     <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="status" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                    <option value="active" <?= ($status_filter ?? 'active') === 'active' ? 'selected' : '' ?>>Active Employees</option>
+                    <option value="inactive" <?= ($status_filter ?? '') === 'inactive' ? 'selected' : '' ?>>Inactive / Deactivated</option>
+                    <option value="all" <?= ($status_filter ?? '') === 'all' ? 'selected' : '' ?>>All Employees</option>
                 </select>
             </div>
             <div class="col-md-5">
@@ -111,21 +120,33 @@ function peso($value) {
                     <td class="align-middle"><span class="fw-bold text-dark small font-monospace"><?= esc($emp['atm_account_no'] ?? '—') ?></span></td>
                     <td class="align-middle"><span class="text-muted small"><?= esc($emp['contact_number'] ?? '—') ?></span></td>
                     <td class="align-middle text-center">
-                        <?php if (($emp['employment_status'] ?? 'Regular') === 'Job Order'): ?>
+                        <?php if (empty($emp['is_active'])): ?>
+                            <span class="badge bg-secondary">Inactive</span>
+                        <?php elseif (($emp['employment_status'] ?? 'Regular') === 'Job Order'): ?>
                             <span class="badge bg-warning text-dark fw-bold">J.O.</span>
                         <?php else: ?>
                             <span class="badge bg-success">Regular</span>
                         <?php endif; ?>
                     </td>
-                    <td class="text-center">
-                        <a href="/employee/edit/<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary border-0"><i class="fas fa-edit"></i></a>
-                        <a href="/deduction/manage/<?= $emp['id'] ?>" class="btn btn-sm btn-outline-info border-0"><i class="fas fa-file-invoice"></i></a>
-                        <a href="/employee/delete/<?= $emp['id'] ?>" class="btn btn-sm btn-outline-danger border-0" onclick="return confirm('Delete this employee? This cannot be undone.')"><i class="fas fa-trash-alt"></i></a>
+                    <td class="text-center text-nowrap">
+                        <a href="/employee/edit/<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary border-0" title="Edit"><i class="fas fa-edit"></i></a>
+                        <a href="/deduction/manage/<?= $emp['id'] ?>" class="btn btn-sm btn-outline-info border-0" title="Deductions"><i class="fas fa-file-invoice"></i></a>
+                        <?php if (empty($emp['is_active'])): ?>
+                            <form action="/employee/reactivate/<?= $emp['id'] ?>" method="post" class="d-inline">
+                                <?= csrf_field() ?>
+                                <button type="submit" class="btn btn-sm btn-outline-success border-0" title="Reactivate"><i class="fas fa-undo"></i></button>
+                            </form>
+                        <?php else: ?>
+                            <form action="/employee/delete/<?= $emp['id'] ?>" method="post" class="d-inline" onsubmit="return confirm('Deactivate or delete this employee? Employees with payroll history will be safely deactivated.')">
+                                <?= csrf_field() ?>
+                                <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Deactivate / Delete"><i class="fas fa-trash-alt"></i></button>
+                            </form>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($employees)): ?>
-                    <tr><td colspan="7" class="text-center text-muted py-4">No employees found.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-4">No employees found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -142,6 +163,10 @@ function peso($value) {
             </div>
             <div class="modal-body">
                 <p class="text-muted small">Upload the payroll Excel file (.xls or .xlsx). Each sheet is automatically imported as its assigned office unit (including RATA vouchers).</p>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">TARGET PAYROLL PERIOD</label>
+                    <input type="month" name="period" class="form-control" value="<?= date('Y-m') ?>" required>
+                </div>
                 <input type="file" name="payroll_file" accept=".xls,.xlsx" class="form-control" required>
             </div>
             <div class="modal-footer">

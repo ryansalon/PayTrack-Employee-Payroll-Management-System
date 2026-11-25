@@ -51,33 +51,61 @@ function peso($value) {
 
 ?>
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-            <h4 class="fw-bold mb-1">Payroll Processing</h4>
-<p class="text-muted small mb-1">Select an office to begin processing the period: <strong><?= date('F Y') ?></strong></p>
-<p class="text-muted small mb-0">Period of Service: <strong><?= date('m/01/Y') . '-' . date('m/t/Y') ?></strong></p>
+            <h4 class="fw-bold mb-1">
+                Payroll Processing
+                <?php if (!empty($is_locked)): ?>
+                    <span class="badge bg-danger ms-2 fs-6"><i class="fas fa-lock me-1"></i>LOCKED</span>
+                <?php else: ?>
+                    <span class="badge bg-secondary ms-2 fs-6">DRAFT</span>
+                <?php endif; ?>
+            </h4>
+            <p class="text-muted small mb-1">Period: <strong><?= esc($period_label ?? date('F Y')) ?></strong></p>
+            <p class="text-muted small mb-0">Period of Service: <strong><?= esc($service_period ?? '') ?></strong></p>
         </div>
-<div class="d-flex gap-2">
-    <a href="/deduction" class="btn btn-outline-dark btn-sm"><i class="fas fa-sliders-h me-1"></i> Manage Deductions</a>
-    <a href="<?= '/payroll/print' . ($office_id ? '?office_id=' . $office_id : '') ?>" class="btn btn-outline-primary btn-sm" target="_blank"><i class="fas fa-print me-1"></i> Print All</a>
-    <a href="<?= '/payroll/export' . ($office_id ? '?office_id=' . $office_id : '') ?>" class="btn btn-success btn-sm"><i class="fas fa-file-export me-1"></i> Export All</a>
-</div>
+        <div class="d-flex flex-wrap gap-2">
+            <?php if (empty($is_locked)): ?>
+                <form action="/payroll/process-batch" method="post" class="d-inline" onsubmit="return confirm('Process payroll for <?= $office_id ? 'all active employees in this office' : 'all active employees across all non-RATA offices' ?> for <?= esc($period_label) ?>?')">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="period" value="<?= esc($period) ?>">
+                    <input type="hidden" name="office_id" value="<?= esc($office_id ?? '') ?>">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-bolt me-1"></i> <?= $office_id ? 'Process Office' : 'Process All Active' ?>
+                    </button>
+                </form>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#lockPeriodModal">
+                    <i class="fas fa-lock me-1"></i> Lock Period
+                </button>
+            <?php else: ?>
+                <button type="button" class="btn btn-warning btn-sm text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#unlockPeriodModal">
+                    <i class="fas fa-unlock me-1"></i> Unlock Period
+                </button>
+            <?php endif; ?>
+            <a href="/deduction?period=<?= esc($period) ?><?= $office_id ? '&office_id=' . urlencode((string) $office_id) : '' ?>" class="btn btn-outline-dark btn-sm"><i class="fas fa-sliders-h me-1"></i> Manage Deductions</a>
+            <a href="/payroll/print?period=<?= esc($period) ?><?= $office_id ? '&office_id=' . urlencode((string) $office_id) : '' ?>" class="btn btn-outline-primary btn-sm" target="_blank"><i class="fas fa-print me-1"></i> Print All</a>
+            <a href="/payroll/export?period=<?= esc($period) ?><?= $office_id ? '&office_id=' . urlencode((string) $office_id) : '' ?>" class="btn btn-success btn-sm"><i class="fas fa-file-export me-1"></i> Export All</a>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm p-3 mb-4 bg-light">
         <form action="/payroll" method="get" class="row g-2 align-items-center">
+            <div class="col-md-3">
+                <input type="month" name="period" class="form-control border-0 shadow-sm" value="<?= esc($period) ?>" onchange="this.form.submit()">
+            </div>
             <div class="col-md-4">
-<select name="office_id" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-    <option value="">Select Office Assignment...</option>
-    <?php foreach($offices as $office): ?>
-        <option value="<?= $office['id'] ?>" <?= (isset($office_id) && $office_id == $office['id']) ? 'selected' : '' ?>><?= $office['office_name'] ?></option>
-    <?php endforeach; ?>
-</select>
+                <select name="office_id" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                    <option value="">All Offices</option>
+                    <?php foreach($offices as $office): ?>
+                        <option value="<?= $office['id'] ?>" <?= (isset($office_id) && (string)$office_id === (string)$office['id']) ? 'selected' : '' ?>><?= esc($office['office_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="col-md-5">
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" name="search" class="form-control border-0" placeholder="Quick find employee ID or name...">
+                    <input type="text" name="search" class="form-control border-0" placeholder="Quick find employee ID, name, or ATM..." value="<?= esc($search ?? '') ?>">
+                    <button type="submit" class="btn btn-outline-secondary border-0 bg-white">Filter</button>
                 </div>
             </div>
         </form>
@@ -134,70 +162,62 @@ function peso($value) {
     foreach($employees as $emp):
     ?>
     <?php
-        $totalDeductions = (float)($emp['total_deductions'] ?? 0);
-        $salaryRate = (float)($emp['salary_rate'] ?? 0);
-        $refundRata = (float)($emp['refund_rata'] ?? 0);
-        
-        // Calculate Total Net Pay = (Salary Rate + Refund/Rata) - Total Deductions
-        $netPay = ($salaryRate + $refundRata) - $totalDeductions;
-        
-        // Calculate 1st Quincena & 2nd Quincena (Remaining Net Pay)
-        if (isset($emp['first_quincena']) && $emp['first_quincena'] !== null && (float)$emp['first_quincena'] > 0 && (float)$emp['first_quincena'] <= $netPay) {
-            $firstQ = (float)$emp['first_quincena'];
-            $secondQ = round($netPay - $firstQ, 2);
-        } else {
-            $firstQ = round($netPay / 2, 2);
-            $secondQ = round($netPay - $firstQ, 2);
-        }
-        
+        $g          = $emp['groups'];
+        $salaryRate = (float) ($emp['salary_rate'] ?? 0);
+        $refundRata = (float) ($emp['refund_rata'] ?? 0);
+        $netPay     = (float) $emp['net_pay_effective'];
+        $firstQ     = (float) $emp['first_quincena'];
+        $secondQ    = (float) $emp['second_quincena'];
+
         $totalFirstQ += $firstQ;
         $totalSecondQ += $secondQ;
         $totalSalaryRate += $salaryRate;
         $totalRefund += $refundRata;
-        $totalGsisPremium += (float)($emp['gsis_premium'] ?? 0);
-        $totalGsisPolicy += (float)($emp['gsis_policy'] ?? 0);
-        $totalGsisOther += (float)($emp['gsis_other'] ?? 0);
-        $totalPagibigPremium += (float)($emp['pagibig_premium'] ?? 0);
-        $totalPagibigLoan += (float)($emp['pagibig_loan'] ?? 0);
-        $totalPhic += (float)($emp['phic'] ?? 0);
-        $totalBankLbp += (float)($emp['bank_lbp'] ?? 0);
-        $totalBankMcc += (float)($emp['bank_mcc'] ?? 0);
-        $totalBank1stvb += (float)($emp['bank_1stvb'] ?? 0);
-        $totalWithholdingTax += (float)($emp['withholding_tax'] ?? 0);
+        $totalGsisPremium += $g['gsis_col1'];
+        $totalGsisPolicy += $g['gsis_policy'];
+        $totalGsisOther += $g['gsis_other'];
+        $totalPagibigPremium += $g['pagibig_premium'];
+        $totalPagibigLoan += $g['pagibig_col2'];
+        $totalPhic += $g['phic'];
+        $totalBankLbp += $g['bank_lbp_col'];
+        $totalBankMcc += $g['bank_mcc'];
+        $totalBank1stvb += $g['bank_1stvb_col'];
+        $totalWithholdingTax += $g['tax'];
         $totalNetPay += $netPay;
     ?>
     <tr class="border-bottom">
         <td class="align-middle text-center" style="width: 40px;"><?= $no++ ?></td>
         <td class="ps-4">
-            <div class="fw-bold"><?= $emp['full_name'] ?></div>
+            <div class="fw-bold"><?= esc($emp['full_name']) ?></div>
         </td>
-        <td><?= $emp['position'] ?></td>
-        <td><?= peso($emp['salary_rate']) ?></td>
-        <td class="text-muted small text-end border-start"><?= peso($emp['refund_rata'] ?? 0) ?></td>
-        <td class="text-danger small text-end border-start"><?= peso($emp['gsis_premium'] ?? 0) ?></td>
-        <td class="text-danger small text-end"><?= peso($emp['gsis_policy'] ?? 0) ?></td>
-        <td class="text-danger small text-end"><?= peso($emp['gsis_other'] ?? 0) ?></td>
-        <td class="text-danger small text-end border-start"><?= peso($emp['pagibig_premium'] ?? 0) ?></td>
-        <td class="text-danger small text-end"><?= peso($emp['pagibig_loan'] ?? 0) ?></td>
-        <td class="text-danger small text-end border-start"><?= peso($emp['phic'] ?? 0) ?></td>
-        <td class="text-danger small text-end border-start"><?= peso($emp['bank_lbp'] ?? 0) ?></td>
-        <td class="text-danger small text-end"><?= peso($emp['bank_mcc'] ?? 0) ?></td>
-        <td class="text-danger small text-end"><?= peso($emp['bank_1stvb'] ?? 0) ?></td>
-        <td class="text-danger small text-end border-start"><?= peso($emp['withholding_tax'] ?? 0) ?></td>
+        <td><?= esc($emp['position']) ?></td>
+        <td><?= peso($salaryRate) ?></td>
+        <td class="text-muted small text-end border-start"><?= peso($refundRata) ?></td>
+        <td class="text-danger small text-end border-start"><?= peso($g['gsis_col1']) ?></td>
+        <td class="text-danger small text-end"><?= peso($g['gsis_policy']) ?></td>
+        <td class="text-danger small text-end"><?= peso($g['gsis_other']) ?></td>
+        <td class="text-danger small text-end border-start"><?= peso($g['pagibig_premium']) ?></td>
+        <td class="text-danger small text-end"><?= peso($g['pagibig_col2']) ?></td>
+        <td class="text-danger small text-end border-start"><?= peso($g['phic']) ?></td>
+        <td class="text-danger small text-end border-start"><?= peso($g['bank_lbp_col']) ?></td>
+        <td class="text-danger small text-end"><?= peso($g['bank_mcc']) ?></td>
+        <td class="text-danger small text-end"><?= peso($g['bank_1stvb_col']) ?></td>
+        <td class="text-danger small text-end border-start"><?= peso($g['tax']) ?></td>
         <td class="fw-bold text-success border-start"><?= peso($netPay) ?></td>
         <td class="text-muted small border-start">1st Q: <?= peso($firstQ) ?><br>2nd Q: <?= peso($secondQ) ?></td>
-        <td class="text-muted small border-start text-end"><?= esc($emp['contact_number'] ?? '') ?></td>
+        <td class="text-muted small border-start text-end"><?= esc($emp['signature_display'] ?? '') ?></td>
         <td class="text-center" style="width: 50px;">
             <div class="dropdown">
                 <button class="btn btn-link text-dark p-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 36px; min-height: 36px;">
                     <i class="fas fa-ellipsis-vertical fa-lg"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                    <?php if (empty($is_locked)): ?>
                     <li>
                     <button class="dropdown-item d-flex align-items-center gap-2 process-btn"
                         data-employee-id="<?= $emp['id'] ?>"
-                        data-employee-name="<?= $emp['full_name'] ?>"
-                        data-designation="<?= $emp['position'] ?>"
+                        data-employee-name="<?= esc($emp['full_name']) ?>"
+                        data-designation="<?= esc($emp['position']) ?>"
                         data-net-pay="<?= $netPay ?>"
                         data-first-quincena="<?= $firstQ ?>"
                         data-second-quincena="<?= $secondQ ?>"
@@ -206,8 +226,9 @@ function peso($value) {
                             <i class="fas fa-calculator text-primary"></i> Process
                         </button>
                     </li>
+                    <?php endif; ?>
                     <li>
-                        <a href="/payslip/individual/<?= $emp['id'] ?>" class="dropdown-item d-flex align-items-center gap-2" target="_blank">
+                        <a href="/payslip/individual/<?= $emp['id'] ?>?period=<?= esc($period) ?>" class="dropdown-item d-flex align-items-center gap-2" target="_blank">
                             <i class="fas fa-print text-success"></i> Print
                         </a>
                     </li>
@@ -266,6 +287,8 @@ function peso($value) {
             <div class="modal-body p-0">
                 <form id="processForm" method="post" action="">
                     <?= csrf_field() ?>
+                    <input type="hidden" name="period" value="<?= esc($period) ?>">
+                    <input type="hidden" name="office_id" value="<?= esc($office_id ?? '') ?>">
                     <div class="bg-light p-4 border-bottom">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -323,6 +346,58 @@ function peso($value) {
                 <button type="submit" form="processForm" class="btn btn-primary px-4"><i class="fas fa-check me-1"></i> Process Payroll</button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Lock Period Modal -->
+<div class="modal fade" id="lockPeriodModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/payroll/lock" method="post" class="modal-content">
+            <?= csrf_field() ?>
+            <input type="hidden" name="period" value="<?= esc($period) ?>">
+            <input type="hidden" name="office_id" value="<?= esc($office_id ?? '') ?>">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-danger"><i class="fas fa-lock me-2"></i>Lock Payroll Period</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">
+                    Locking <strong><?= esc($period_label) ?> (<?= esc($period) ?>)</strong> freezes its processed payroll snapshots so future salary, deduction, or employee edits cannot alter this month's records, payslips, or reports.
+                </p>
+                <div class="mb-2">
+                    <label class="form-label small fw-bold text-muted">NOTES (OPTIONAL)</label>
+                    <input type="text" name="notes" class="form-control" placeholder="e.g. Disbursed &amp; submitted to COA">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger fw-bold">Lock Period</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Unlock Period Modal -->
+<div class="modal fade" id="unlockPeriodModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/payroll/unlock" method="post" class="modal-content">
+            <?= csrf_field() ?>
+            <input type="hidden" name="period" value="<?= esc($period) ?>">
+            <input type="hidden" name="office_id" value="<?= esc($office_id ?? '') ?>">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-warning"><i class="fas fa-unlock me-2"></i>Unlock Payroll Period</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-0">
+                    Are you sure you want to reopen <strong><?= esc($period_label) ?> (<?= esc($period) ?>)</strong> for edits? Re-lock it once corrections are complete.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning text-dark fw-bold">Unlock Period</button>
+            </div>
+        </form>
     </div>
 </div>
 

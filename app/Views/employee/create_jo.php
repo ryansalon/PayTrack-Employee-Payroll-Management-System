@@ -14,6 +14,7 @@
                 </div>
 
                 <form action="/employee/store" method="post">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="employment_status" value="Job Order">
                     
                     <div class="row g-3">

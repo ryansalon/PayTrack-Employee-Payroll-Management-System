@@ -159,12 +159,28 @@
         <!-- RIGHT: Pay Details Form -->
         <div class="col-lg-8">
             <div class="card erp-card">
-                <div class="card-header text-white py-3">
-                    <h6 class="mb-0 fw-bold">Modify Monthly Deductions</h6>
+                <div class="card-header text-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">Modify Monthly Deductions — <?= esc($period_label ?? date('F Y')) ?></h6>
+                    <?php if (!empty($is_locked)): ?>
+                        <span class="badge bg-danger"><i class="fas fa-lock me-1"></i>Period Locked</span>
+                    <?php elseif (!empty($is_past_unlocked)): ?>
+                        <span class="badge bg-warning text-dark"><i class="fas fa-history me-1"></i>Historical Period</span>
+                    <?php endif; ?>
                 </div>
                 <div class="card-body p-4">
+                    <?php if (!empty($is_locked)): ?>
+                        <div class="alert alert-warning small mb-3">
+                            <i class="fas fa-lock me-1"></i> Period <strong><?= esc($period) ?></strong> is locked. Saving updates this employee's standing profile for future months only; <strong><?= esc($period) ?></strong> remains unchanged.
+                        </div>
+                    <?php elseif (!empty($is_past_unlocked)): ?>
+                        <div class="alert alert-info small mb-3">
+                            <i class="fas fa-history me-1"></i> Editing historical period <strong><?= esc($period) ?></strong> — changes apply only to this month and will not alter current standing rates.
+                        </div>
+                    <?php endif; ?>
                     <form action="/deduction/update" method="post">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="employee_id" value="<?= $employee['id'] ?>">
+                        <input type="hidden" name="period" value="<?= esc($period) ?>">
 
                         <!-- PAY SUMMARY STRIP -->
                         <div class="pay-summary-strip">
@@ -173,7 +189,7 @@
                                     <label class="pay-label">MONTHLY RATE</label>
                                     <div class="input-group">
                                         <span class="input-group-text">₱</span>
-                                        <input type="text" inputmode="decimal" id="salary_rate" name="salary_rate" class="form-control deduction-input money-format" value="<?= number_format($employee['salary_rate'], 2) ?>">
+                                        <input type="text" inputmode="decimal" id="salary_rate" name="salary_rate" class="form-control deduction-input money-format" value="<?= number_format($salary_rate ?? $employee['salary_rate'], 2) ?>">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -187,10 +203,15 @@
                                     <label class="pay-label">REFUND / RATA</label>
                                     <div class="input-group">
                                         <span class="input-group-text">₱</span>
-                                        <input type="text" inputmode="decimal" id="refund_rata" name="refund_rata" class="form-control money-format" value="<?= number_format($refund_rata ?? 0, 2) ?>">
+                                        <input type="text" inputmode="decimal" id="refund_rata" name="refund_rata" class="form-control money-format" value="<?= number_format($refund_rata ?? 0, 2) ?>" <?= !empty($is_locked) ? 'disabled' : '' ?>>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label deduction-label small">BANK / ATM ACCOUNT NUMBER (SHOWN IN PAYROLL SIGNATURE COLUMN)</label>
+                            <input type="text" name="atm_account_no" class="form-control" value="<?= esc($atm_account_no ?? $employee['atm_account_no'] ?? '') ?>" placeholder="e.g. 1234-5678-90 (Landbank / LBP)">
                         </div>
 
                         <div class="row g-3">
@@ -275,18 +296,25 @@
                                         <p class="deduction-section-title">Pag-IBIG</p>
                                     </div>
                                     <div class="row g-3">
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <label class="form-label deduction-label small">PREMIUM (PERSONAL)</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="pagibig_premium" class="form-control deduction-input money-format" value="<?= number_format($deductions['pagibig_premium'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label deduction-label small">SALARY LOAN / MP2</label>
+                                        <div class="col-md-4">
+                                            <label class="form-label deduction-label small">SALARY / CALAMITY LOAN</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="pagibig_loan" class="form-control deduction-input money-format" value="<?= number_format($deductions['pagibig_loan'] ?? 0, 2) ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label deduction-label small">PAG-IBIG MP2</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text deduction-prefix">₱</span>
+                                                <input type="text" inputmode="decimal" name="pagibig_mp2" class="form-control deduction-input money-format" value="<?= number_format($deductions['pagibig_mp2'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -302,10 +330,17 @@
                                     </div>
                                     <div class="row g-3">
                                         <div class="col-md-4">
-                                            <label class="form-label deduction-label small">LBP / OTHER PAYABLES</label>
+                                            <label class="form-label deduction-label small">LBP</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="bank_lbp" class="form-control deduction-input money-format" value="<?= number_format($deductions['bank_lbp'] ?? 0, 2) ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label deduction-label small">OTHER PAYABLES (LBP COL.)</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text deduction-prefix">₱</span>
+                                                <input type="text" inputmode="decimal" name="bank_other_payables" class="form-control deduction-input money-format" value="<?= number_format($deductions['bank_other_payables'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -315,11 +350,18 @@
                                                 <input type="text" inputmode="decimal" name="bank_mcc" class="form-control deduction-input money-format" value="<?= number_format($deductions['bank_mcc'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label deduction-label small">1STVB / RBT</label>
+                                        <div class="col-md-6">
+                                            <label class="form-label deduction-label small">1ST VALLEY BANK (1STVB)</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="bank_1stvb" class="form-control deduction-input money-format" value="<?= number_format($deductions['bank_1stvb'] ?? 0, 2) ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label deduction-label small">RBT</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text deduction-prefix">₱</span>
+                                                <input type="text" inputmode="decimal" name="bank_rbt" class="form-control deduction-input money-format" value="<?= number_format($deductions['bank_rbt'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -331,38 +373,45 @@
                                 <div class="deduction-section">
                                     <div class="deduction-section-header">
                                         <span class="deduction-section-icon"><i class="fas fa-file-invoice"></i></span>
-                                        <p class="deduction-section-title">Other Deductions</p>
+                                        <p class="deduction-section-title">PhilHealth, Tax &amp; Other Deductions</p>
                                     </div>
                                     <div class="row g-3">
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <label class="form-label deduction-label small">PHIC (PHILHEALTH)</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="phic" class="form-control deduction-input money-format" value="<?= number_format($deductions['phic'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
+                                            <label class="form-label deduction-label small">PHIC DIFFERENTIAL</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text deduction-prefix">₱</span>
+                                                <input type="text" inputmode="decimal" name="phic_diff" class="form-control deduction-input money-format" value="<?= number_format($deductions['phic_diff'] ?? 0, 2) ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
                                             <label class="form-label deduction-label small">BIR W/T TAX</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="tax" class="form-control deduction-input money-format" value="<?= number_format($deductions['withholding_tax'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <label class="form-label deduction-label small">LOANS</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="loans" class="form-control deduction-input money-format" value="<?= number_format($deductions['loans'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <label class="form-label deduction-label small">GOVERNMENT CONTRIBUTION</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
                                                 <input type="text" inputmode="decimal" name="gov" class="form-control deduction-input money-format" value="<?= number_format($deductions['government_cont'] ?? 0, 2) ?>">
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <label class="form-label deduction-label small">OTHER DEDUCTIONS</label>
                                             <div class="input-group">
                                                 <span class="input-group-text deduction-prefix">₱</span>
@@ -427,11 +476,12 @@ function updateEmployerShares() {
 function recalcNetPay() {
     updateEmployerShares();
     const monthlyRate = parseFloat(unformatMoney(document.getElementById('salary_rate').value)) || 0;
+    const refundRata  = parseFloat(unformatMoney(document.getElementById('refund_rata')?.value || '0')) || 0;
     let totalDeductions = 0;
     document.querySelectorAll('.deduction-input:not(#salary_rate)').forEach(input => {
         totalDeductions += parseFloat(unformatMoney(input.value)) || 0;
     });
-    const netPay = monthlyRate - totalDeductions;
+    const netPay = (monthlyRate + refundRata) - totalDeductions;
 
     const netPayInput = document.getElementById('net_pay_display');
     const netPaySign = netPayInput.previousElementSibling;
@@ -469,7 +519,7 @@ document.querySelectorAll('.money-format').forEach(input => {
             raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
         }
         this.value = addCommas(raw);
-        if (this.classList.contains('deduction-input')) {
+        if (this.classList.contains('deduction-input') || this.id === 'refund_rata') {
             recalcNetPay();
         }
     });
@@ -481,7 +531,7 @@ document.querySelectorAll('.money-format').forEach(input => {
         } else {
             this.value = addCommas(parseFloat(raw).toFixed(2));
         }
-        if (this.classList.contains('deduction-input')) {
+        if (this.classList.contains('deduction-input') || this.id === 'refund_rata') {
             recalcNetPay();
         }
     });

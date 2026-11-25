@@ -7,18 +7,19 @@
             <div class="card border-0 shadow-sm p-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h5 class="fw-bold">Update Employee Record</h5>
-                    <span class="badge bg-soft-danger text-danger">ID: <?= $employee['employee_id'] ?></span>
+                    <span class="badge bg-soft-danger text-danger">ID: <?= esc($employee['employee_id']) ?></span>
                 </div>
                 <form action="/employee/update/<?= $employee['id'] ?>" method="post">
+                    <?= csrf_field() ?>
                     <div class="row g-3">
                         <!-- Prefilled data -->
                         <div class="col-md-12">
                             <label class="form-label text-muted small fw-bold">FULL NAME</label>
-                            <input type="text" name="full_name" class="form-control" value="<?= $employee['full_name'] ?>" required>
+                            <input type="text" name="full_name" class="form-control" value="<?= esc($employee['full_name']) ?>" required>
                         </div>
 <div class="col-md-6">
                             <label class="form-label text-muted small fw-bold">DESIGNATION</label>
-                            <input type="text" name="position" class="form-control" value="<?= $employee['position'] ?? '' ?>" required>
+                            <input type="text" name="position" class="form-control" value="<?= esc($employee['position'] ?? '') ?>" required>
                         </div>
 <?php
     $currentOfficeName = '';
@@ -53,6 +54,9 @@
                         </div>
                     </div>
                 </form>
+                <form id="deactivateEmployeeForm" action="/employee/delete/<?= $employee['id'] ?>" method="post" class="d-none">
+                    <?= csrf_field() ?>
+                </form>
             </div>
         </div>
     </div>
@@ -60,8 +64,8 @@
 
 <script>
     function confirmDelete() {
-        if(confirm("Are you sure you want to remove this employee record?")) {
-            window.location.href = "/employee/delete/<?= $employee['id'] ?>";
+        if (confirm("Are you sure you want to deactivate/remove this employee? Historical payroll records will be preserved.")) {
+            document.getElementById('deactivateEmployeeForm').submit();
         }
     }
 </script>
@@ -105,13 +109,19 @@
         bootstrap.Modal.getInstance(document.getElementById('officeModal')).hide();
     }
 
+function csrfHeaders(extra = {}) {
+        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const header = document.querySelector('meta[name="csrf-header"]')?.content || 'X-CSRF-TOKEN';
+        return Object.assign({ [header]: token }, extra);
+    }
+
 function addOffice() {
         const name = document.getElementById('new_office_name').value.trim();
         if (!name) return;
 
         fetch('/office/store', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: csrfHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
             body: 'office_name=' + encodeURIComponent(name)
         })
         .then(res => res.json())
@@ -137,7 +147,7 @@ function addOffice() {
     }
 
 function deleteOffice(id) {
-        fetch('/office/delete/' + id, { method: 'POST' })
+        fetch('/office/delete/' + id, { method: 'POST', headers: csrfHeaders() })
         .then(res => res.json())
         .then(data => {
             if (data.success) {

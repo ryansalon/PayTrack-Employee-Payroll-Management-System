@@ -50,18 +50,28 @@ function peso($value) {
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h4 class="fw-bold mb-1">Deduction Management</h4>
-            <p class="text-muted small mb-1">Select an office to manage deductions for the period: <strong><?= date('F Y') ?></strong></p>
-            <p class="text-muted small mb-0">Period of Service: <strong><?= date('m/01/Y') . '-' . date('m/t/Y') ?></strong></p>
+            <h4 class="fw-bold mb-1">
+                Deduction Management
+                <?php if (!empty($is_locked)): ?>
+                    <span class="badge bg-danger ms-2 fs-6"><i class="fas fa-lock me-1"></i>LOCKED</span>
+                <?php else: ?>
+                    <span class="badge bg-secondary ms-2 fs-6">DRAFT</span>
+                <?php endif; ?>
+            </h4>
+            <p class="text-muted small mb-1">Period: <strong><?= esc($period_label ?? date('F Y')) ?></strong></p>
+            <p class="text-muted small mb-0">Period of Service: <strong><?= esc($service_period ?? '') ?></strong></p>
         </div>
-        <a href="/payroll" class="btn btn-outline-dark btn-sm"><i class="fas fa-arrow-left me-1"></i> Back to Payroll</a>
+        <a href="/payroll?period=<?= esc($period) ?><?= $office_id ? '&office_id=' . urlencode((string) $office_id) : '' ?>" class="btn btn-outline-dark btn-sm"><i class="fas fa-arrow-left me-1"></i> Back to Payroll</a>
     </div>
 
     <div class="card border-0 shadow-sm p-3 mb-4 bg-light">
         <form action="/deduction" method="get" class="row g-2 align-items-center">
+            <div class="col-md-2">
+                <input type="month" name="period" class="form-control border-0 shadow-sm" value="<?= esc($period) ?>" onchange="this.form.submit()">
+            </div>
             <div class="col-md-3">
                 <select name="office_id" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                    <option value="">Select Office Assignment...</option>
+                    <option value="">All Offices</option>
                     <?php foreach ($offices as $office): ?>
                         <option value="<?= $office['id'] ?>" <?= ($office_id == $office['id']) ? 'selected' : '' ?>>
                             <?= esc($office['office_name']) ?>
@@ -69,9 +79,9 @@ function peso($value) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="bank_filter" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                    <option value="">Filter by Bank / Payable...</option>
+                    <option value="">Bank / Payable...</option>
                     <option value="lbp" <?= ($bank_filter ?? '') === 'lbp' ? 'selected' : '' ?>>LandBank (LBP)</option>
                     <option value="mcc" <?= ($bank_filter ?? '') === 'mcc' ? 'selected' : '' ?>>MCC</option>
                     <option value="1stvb" <?= ($bank_filter ?? '') === '1stvb' ? 'selected' : '' ?>>1stVB</option>
@@ -79,9 +89,9 @@ function peso($value) {
                     <option value="other" <?= ($bank_filter ?? '') === 'other' ? 'selected' : '' ?>>Other Payables</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="gsis_filter" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                    <option value="">Filter by GSIS Type...</option>
+                    <option value="">GSIS Type...</option>
                     <option value="premium" <?= ($gsis_filter ?? '') === 'premium' ? 'selected' : '' ?>>GSIS Personal Premium (9%)</option>
                     <option value="policy" <?= ($gsis_filter ?? '') === 'policy' ? 'selected' : '' ?>>GSIS Conso / Policy</option>
                     <option value="other" <?= ($gsis_filter ?? '') === 'other' ? 'selected' : '' ?>>GSIS GFAL / Emergency</option>
@@ -92,7 +102,7 @@ function peso($value) {
             <div class="col-md-3">
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" name="search" class="form-control border-0" 
+                    <input type="text" name="search" class="form-control border-0"
                            placeholder="Search ID or name..." value="<?= esc($search ?? '') ?>">
                 </div>
             </div>
@@ -150,28 +160,24 @@ function peso($value) {
             foreach ($records as $r):
             ?>
             <?php
-                $totalDeductions = ($r['gsis_premium'] ?? 0) + ($r['gsis_policy'] ?? 0) + ($r['gsis_other'] ?? 0)
-                                 + ($r['pagibig_premium'] ?? 0) + ($r['pagibig_loan'] ?? 0)
-                                 + ($r['phic'] ?? 0)
-                                 + ($r['bank_lbp'] ?? 0) + ($r['bank_mcc'] ?? 0) + ($r['bank_1stvb'] ?? 0)
-                                 + ($r['withholding_tax'] ?? 0);
-                $netPay  = $r['net_pay'] ?? (($r['salary_rate'] ?? 0) - $totalDeductions);
-                $firstQ  = $r['first_quincena'] ?? round($netPay / 2, 2);
-                $secondQ = $r['second_quincena'] ?? round($netPay - $firstQ, 2);
+                $g       = $r['groups'];
+                $netPay  = $r['net_pay_effective'];
+                $firstQ  = $r['first_q_effective'];
+                $secondQ = $r['second_q_effective'];
                 $totalFirstQ += $firstQ;
                 $totalSecondQ += $secondQ;
-                $totalSalaryRate += $r['salary_rate'] ?? 0;
+                $totalSalaryRate += $r['salary_rate_effective'];
                 $totalRefund += $r['refund_rata'] ?? 0;
-                $totalGsisPremium += $r['gsis_premium'] ?? 0;
-                $totalGsisPolicy += $r['gsis_policy'] ?? 0;
-                $totalGsisOther += $r['gsis_other'] ?? 0;
-                $totalPagibigPremium += $r['pagibig_premium'] ?? 0;
-                $totalPagibigLoan += $r['pagibig_loan'] ?? 0;
-                $totalPhic += $r['phic'] ?? 0;
-                $totalBankLbp += $r['bank_lbp'] ?? 0;
-                $totalBankMcc += $r['bank_mcc'] ?? 0;
-                $totalBank1stvb += $r['bank_1stvb'] ?? 0;
-                $totalWithholdingTax += $r['withholding_tax'] ?? 0;
+                $totalGsisPremium += $g['gsis_col1'];
+                $totalGsisPolicy += $g['gsis_policy'];
+                $totalGsisOther += $g['gsis_other'];
+                $totalPagibigPremium += $g['pagibig_premium'];
+                $totalPagibigLoan += $g['pagibig_col2'];
+                $totalPhic += $g['phic'];
+                $totalBankLbp += $g['bank_lbp_col'];
+                $totalBankMcc += $g['bank_mcc'];
+                $totalBank1stvb += $g['bank_1stvb_col'];
+                $totalWithholdingTax += $g['tax'];
                 $totalNetPay += $netPay;
             ?>
     <tr class="border-bottom">
@@ -180,23 +186,23 @@ function peso($value) {
 <div class="fw-bold"><?= esc($r['full_name']) ?></div>
         </td>
                 <td><?= esc($r['position']) ?></td>
-                <td><?= peso($r['salary_rate'] ?? 0) ?></td>
+                <td><?= peso($r['salary_rate_effective']) ?></td>
                 <td class="text-muted small text-end border-start"><?= peso($r['refund_rata'] ?? 0) ?></td>
-                <td class="text-danger small text-end border-start"><?= peso($r['gsis_premium'] ?? 0) ?></td>
-                <td class="text-danger small text-end"><?= peso($r['gsis_policy'] ?? 0) ?></td>
-                <td class="text-danger small text-end"><?= peso($r['gsis_other'] ?? 0) ?></td>
-                <td class="text-danger small text-end border-start"><?= peso($r['pagibig_premium'] ?? 0) ?></td>
-                <td class="text-danger small text-end"><?= peso($r['pagibig_loan'] ?? 0) ?></td>
-                <td class="text-danger small text-end border-start"><?= peso($r['phic'] ?? 0) ?></td>
-                <td class="text-danger small text-end border-start"><?= peso($r['bank_lbp'] ?? 0) ?></td>
-                <td class="text-danger small text-end"><?= peso($r['bank_mcc'] ?? 0) ?></td>
-                <td class="text-danger small text-end"><?= peso($r['bank_1stvb'] ?? 0) ?></td>
-                <td class="text-danger small text-end border-start"><?= peso($r['withholding_tax'] ?? 0) ?></td>
+                <td class="text-danger small text-end border-start"><?= peso($g['gsis_col1']) ?></td>
+                <td class="text-danger small text-end"><?= peso($g['gsis_policy']) ?></td>
+                <td class="text-danger small text-end"><?= peso($g['gsis_other']) ?></td>
+                <td class="text-danger small text-end border-start"><?= peso($g['pagibig_premium']) ?></td>
+                <td class="text-danger small text-end"><?= peso($g['pagibig_col2']) ?></td>
+                <td class="text-danger small text-end border-start"><?= peso($g['phic']) ?></td>
+                <td class="text-danger small text-end border-start"><?= peso($g['bank_lbp_col']) ?></td>
+                <td class="text-danger small text-end"><?= peso($g['bank_mcc']) ?></td>
+                <td class="text-danger small text-end"><?= peso($g['bank_1stvb_col']) ?></td>
+                <td class="text-danger small text-end border-start"><?= peso($g['tax']) ?></td>
                 <td class="fw-bold text-success border-start"><?= peso($netPay) ?></td>
                 <td class="text-muted small border-start">1st Q: <?= peso($firstQ) ?><br>2nd Q: <?= peso($secondQ) ?></td>
-                <td class="text-muted small border-start text-end"><?= esc($r['contact_number'] ?? '') ?></td>
+                <td class="text-muted small border-start text-end"><?= esc($r['signature_display'] ?? '') ?></td>
                 <td class="text-end pe-4 text-nowrap">
-                    <a href="/deduction/manage/<?= $r['id'] ?>" class="btn btn-success btn-sm px-3 rounded-pill">Edit</a>
+                    <a href="/deduction/manage/<?= $r['id'] ?>?period=<?= esc($period) ?>" class="btn btn-success btn-sm px-3 rounded-pill">Edit</a>
                 </td>
     </tr>
             <?php endforeach; ?>
