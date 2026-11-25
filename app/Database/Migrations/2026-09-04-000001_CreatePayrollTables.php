@@ -8,6 +8,10 @@ class CreatePayrollTables extends Migration
 {
     public function up()
     {
+        $updatedAtDef = $this->db->DBDriver === 'SQLite3'
+            ? 'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP'
+            : 'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP';
+
         // 1. Users Table
         $this->forge->addField([
             'id' => [
@@ -117,7 +121,7 @@ class CreatePayrollTables extends Migration
                 'null'       => true,
             ],
             'created_at DATETIME DEFAULT CURRENT_TIMESTAMP',
-            'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+            $updatedAtDef,
         ]);
         $this->forge->addKey('id', true);
         $this->forge->createTable('employees', true);
@@ -155,7 +159,7 @@ class CreatePayrollTables extends Migration
             'bank_1stvb'          => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => 0.00],
             'bank_rbt'            => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => 0.00],
             'created_at DATETIME DEFAULT CURRENT_TIMESTAMP',
-            'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+            $updatedAtDef,
         ]);
         $this->forge->addKey('id', true);
         $this->forge->createTable('deductions', true);
@@ -224,7 +228,7 @@ class CreatePayrollTables extends Migration
                 'null'       => true,
             ],
             'created_at DATETIME DEFAULT CURRENT_TIMESTAMP',
-            'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+            $updatedAtDef,
         ]);
         $this->forge->addKey('id', true);
         $this->forge->createTable('payroll_records', true);

@@ -10,18 +10,26 @@ class PayrollModel extends Model
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
-protected $allowedFields    = [
-        'employee_id', 
-        'payroll_period', 
+    protected $allowedFields    = [
+        'employee_id',
+        'payroll_period',
         'period_of_service',
         'refund_rata',
-        'gross_pay', 
-        'total_deductions', 
-        'net_pay', 
+        'gross_pay',
+        'total_deductions',
+        'net_pay',
         'first_quincena',
         'second_quincena',
         'cash_paid',
-        'processed_by'
+        'processed_by',
+        'deduction_snapshot',
+        'salary_rate_snapshot',
+        'employee_code_snapshot',
+        'full_name_snapshot',
+        'office_id_snapshot',
+        'office_name_snapshot',
+        'position_snapshot',
+        'atm_account_no_snapshot',
     ];
 
     /**
