@@ -1,230 +1,73 @@
+<?php
+use App\Libraries\PayrollCalculator;
+
+function peso($value) {
+    $value = (float) $value;
+    return $value != 0 ? '₱' . number_format($value, 2) : '₱0.00';
+}
+
+$lguName         = $settings['lgu_name'] ?? 'LGU-MAHINOG';
+$basicPay        = (float) ($employee['basic_pay'] ?? 0);
+$rata            = (float) ($employee['refund_rata'] ?? 0);
+$totalEarnings   = (float) ($employee['gross_pay'] ?? ($basicPay + $rata));
+$totalDeductions = (float) ($employee['total_deductions'] ?? PayrollCalculator::totalDeductions($deductions));
+$netPay          = (float) ($employee['net_pay'] ?? ($totalEarnings - $totalDeductions));
+$firstHalf       = (float) ($employee['first_quincena'] ?? 0);
+$secondHalf      = (float) ($employee['second_quincena'] ?? 0);
+
+// Always show the 4 core statutory items, plus every other non-zero deduction so lines sum to Total Deductions
+$coreKeys = ['gsis_premium', 'pagibig_premium', 'phic', 'withholding_tax'];
+$deductionLines = [];
+foreach (PayrollCalculator::DEDUCTION_FIELDS as $field) {
+    $amount = (float) ($deductions[$field] ?? 0);
+    if (in_array($field, $coreKeys, true) || $amount != 0.0) {
+        $deductionLines[] = [
+            'label'  => PayrollCalculator::DEDUCTION_LABELS[$field] ?? $field,
+            'amount' => $amount,
+        ];
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payslip — <?= esc($employee['full_name'] ?? '') ?></title>
-    <?php
-    function peso($value) {
-        return $value > 0 ? '₱' . number_format($value, 2) : '';
-    }
-    function fmt($value) {
-        $value = (float)($value ?? 0);
-        return $value != 0 ? number_format($value, 2) : '';
-    }
-    function gsisTotal($emp) {
-        return ($emp['gsis_premium'] ?? 0) + ($emp['gsis_policy'] ?? 0) + ($emp['gsis_other'] ?? 0)
-             + ($emp['gsis_ouli'] ?? 0) + ($emp['gsis_diff'] ?? 0);
-    }
-    function pagibigTotal($emp) {
-        return ($emp['pagibig_premium'] ?? 0) + ($emp['pagibig_loan'] ?? 0) + ($emp['pagibig_mp2'] ?? 0);
-    }
-    function phicTotal($emp) {
-        return ($emp['phic'] ?? 0) + ($emp['phic_diff'] ?? 0);
-    }
-    function employeeDeductions($emp) {
-        $t = 0;
-        foreach (['gsis_premium','gsis_policy','gsis_other','gsis_ouli','gsis_diff',
-                 'pagibig_premium','pagibig_loan','pagibig_mp2','phic','phic_diff',
-                 'withholding_tax','loans','government_cont','other_deduct',
-                 'bank_lbp','bank_other_payables','bank_mcc','bank_1stvb','bank_rbt'] as $f) {
-            $t += (float)($emp[$f] ?? 0);
-        }
-        return $t;
-    }
-
-    $periodStart = '';
-    $periodEnd = '';
-    if (!empty($period_label)) {
-        $periodStart = date('m/d/Y', strtotime($period_label));
-        $periodEnd = date('m/d/Y', strtotime('last day of this month', strtotime($period_label)));
-    }
-
-    $basicPay = $employee['salary_rate'] ?? 0;
-    $rata = $employee['refund_rata'] ?? 0;
-    $totalEarnings = $basicPay + $rata;
-    $totalDeductions = employeeDeductions($employee);
-    $netPay = $employee['net_pay'] ?? ($totalEarnings - $totalDeductions);
-    $firstHalf = $employee['first_quincena'] ?? 0;
-    $secondHalf = $employee['second_quincena'] ?? 0;
-    ?>
     <style>
         * { font-family: Arial, sans-serif !important; box-sizing: border-box; }
         body { background: #fff; margin: 0; padding: 0; color: #000; }
-        .payslip-page {
-            width: 100%;
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 35px 55px 40px 55px;
-        }
-        .payslip-header {
-            text-align: center;
-            margin-bottom: 8px;
-        }
-        .payslip-header .logo-area {
-            text-align: left;
-            margin-bottom: 10px;
-        }
-        .payslip-header .logo-area img {
-            height: 70px;
-            width: auto;
-        }
-        .payslip-header h1 {
-            font-size: 20px;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin: 0;
-            letter-spacing: 2px;
-        }
-        .payslip-header .subtitle {
-            font-size: 11px;
-            color: #333;
-            margin-top: 4px;
-            line-height: 1.4;
-        }
-        .divider {
-            border-top: 2px solid #000;
-            margin-top: 8px;
-            margin-bottom: 20px;
-        }
-        .info-section {
-            margin-bottom: 55px;
-        }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-        .info-col {
-            width: 50%;
-        }
-        .info-item {
-            margin-bottom: 6px;
-            font-size: 14px;
-        }
-        .info-item .label {
-            font-weight: normal;
-            margin-right: 8px;
-        }
-        .info-item .value {
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .info-col.right {
-            text-align: right;
-        }
-        .details-section {
-            margin-bottom: 70px;
-        }
-        .details-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 20px;
-        }
-        .details-col {
-            width: 50%;
-        }
-        .details-col.left {
-            padding-right: 10px;
-        }
-        .details-col.right {
-            padding-left: 10px;
-        }
-        .section-title {
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid #000;
-        }
-        .detail-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 3px 0;
-            font-size: 13px;
-            border-bottom: 1px dotted #ccc;
-        }
-        .detail-item .label {
-            flex: 1;
-        }
-        .detail-item .amount {
-            text-align: right;
-            font-weight: normal;
-            min-width: 120px;
-        }
-        .total-box {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 30px;
-            gap: 20px;
-        }
-        .total-item {
-            width: 50%;
-            border-top: 2px solid #000;
-            border-bottom: 2px solid #000;
-            padding: 8px 0;
-            font-size: 15px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .total-item .label {
-            display: inline;
-        }
-        .total-item .amount {
-            float: right;
-        }
-        .net-pay-box {
-            margin-top: 30px;
-            border-top: 2px solid #000;
-            border-bottom: 3px double #000;
-            padding: 10px 0;
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .net-pay-box .label {
-            display: inline;
-        }
-        .net-pay-box .amount {
-            float: right;
-        }
-        .half-pay-box {
-            margin-top: 25px;
-            display: flex;
-            gap: 20px;
-        }
-        .half-item {
-            width: 50%;
-            border-top: 2px solid #000;
-            border-bottom: 2px solid #000;
-            padding: 8px 0;
-            font-size: 15px;
-            font-weight: bold;
-            text-transform: uppercase;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .half-item.right {
-            text-align: right;
-            justify-content: flex-end;
-        }
-        .text-end { text-align: right !important; }
-        .fw-bold { font-weight: bold; }
+        .payslip-page { width: 100%; max-width: 100%; margin: 0 auto; padding: 35px 55px 40px 55px; }
+        .payslip-header { text-align: center; margin-bottom: 8px; }
+        .payslip-header .logo-area { text-align: left; margin-bottom: 10px; }
+        .payslip-header .logo-area img { height: 70px; width: auto; }
+        .payslip-header h1 { font-size: 20px; font-weight: bold; text-transform: uppercase; margin: 0; letter-spacing: 2px; }
+        .divider { border-top: 2px solid #000; margin-top: 8px; margin-bottom: 20px; }
+        .info-section { margin-bottom: 40px; }
+        .info-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        .info-col { width: 50%; }
+        .info-item { margin-bottom: 6px; font-size: 14px; }
+        .info-item .label { font-weight: normal; margin-right: 8px; }
+        .info-item .value { font-weight: bold; text-transform: uppercase; }
+        .info-col.right { text-align: right; }
+        .details-section { margin-bottom: 50px; }
+        .details-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+        .details-col { width: 50%; }
+        .details-col.left { padding-right: 10px; }
+        .details-col.right { padding-left: 10px; }
+        .section-title { font-size: 16px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #000; }
+        .detail-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 13px; border-bottom: 1px dotted #ccc; }
+        .detail-item .label { flex: 1; }
+        .detail-item .amount { text-align: right; font-weight: normal; min-width: 120px; }
+        .total-box { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; gap: 20px; }
+        .total-item { width: 50%; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 8px 0; font-size: 15px; font-weight: bold; text-transform: uppercase; display: flex; justify-content: space-between; }
+        .net-pay-box { margin-top: 25px; border-top: 2px solid #000; border-bottom: 3px double #000; padding: 10px 0; font-size: 16px; font-weight: bold; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+        .half-pay-box { margin-top: 20px; display: flex; gap: 20px; }
+        .half-item { width: 50%; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 8px 0; font-size: 15px; font-weight: bold; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
         @media print {
             body { background: #fff; }
             .payslip-page { padding: 20px 40px 20px 40px; }
-            @page {
-                size: A4 portrait;
-                margin: 20px 40px 20px 40px;
-            }
+            @page { size: A4 portrait; margin: 20px 40px 20px 40px; }
         }
     </style>
 </head>
@@ -233,15 +76,9 @@
 <div class="payslip-page">
     <div class="payslip-header">
         <div class="logo-area">
-            <svg width="70" height="70" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="50" cy="50" r="45" stroke="#000" stroke-width="2" fill="none"/>
-                <circle cx="50" cy="50" r="38" stroke="#000" stroke-width="1" fill="none"/>
-                <text x="50" y="45" text-anchor="middle" font-size="10" font-weight="bold" fill="#000">LGU</text>
-                <text x="50" y="58" text-anchor="middle" font-size="8" fill="#000">MAHINOG</text>
-                <text x="50" y="68" text-anchor="middle" font-size="7" fill="#000">Camiguin</text>
-            </svg>
+            <img src="<?= base_url('mahinoglgu.png') ?>" alt="<?= esc($lguName) ?> Seal">
         </div>
-        <h1>LGU-MAHINOG</h1>
+        <h1><?= esc($lguName) ?></h1>
         <h1>Municipal Payroll</h1>
     </div>
 
@@ -266,11 +103,11 @@
             <div class="info-col right">
                 <div class="info-item">
                     <span class="label">Pay Period Start Date:</span>
-                    <span class="value"><?= esc($periodStart) ?></span>
+                    <span class="value"><?= esc($period_start ?? '') ?></span>
                 </div>
                 <div class="info-item">
                     <span class="label">Pay Period End Date:</span>
-                    <span class="value"><?= esc($periodEnd) ?></span>
+                    <span class="value"><?= esc($period_end ?? '') ?></span>
                 </div>
             </div>
         </div>
@@ -280,39 +117,27 @@
         <div class="details-row">
             <div class="details-col left">
                 <div class="section-title">Earnings:</div>
+                <?php if ($basicPay > 0 || $rata <= 0): ?>
                 <div class="detail-item">
                     <span class="label">Basic Pay</span>
                     <span class="amount"><?= peso($basicPay) ?></span>
                 </div>
+                <?php endif; ?>
                 <?php if ($rata > 0): ?>
                 <div class="detail-item">
-                    <span class="label">Refund / Rata (PERA/ACA Diff.)</span>
+                    <span class="label">Refund / RATA (PERA/ACA Diff.)</span>
                     <span class="amount"><?= peso($rata) ?></span>
                 </div>
                 <?php endif; ?>
             </div>
             <div class="details-col right">
                 <div class="section-title">Deductions:</div>
+                <?php foreach ($deductionLines as $line): ?>
                 <div class="detail-item">
-                    <span class="label">GSIS Personal Premium</span>
-                    <span class="amount"><?= peso($employee['gsis_premium'] ?? 0) ?></span>
+                    <span class="label"><?= esc($line['label']) ?></span>
+                    <span class="amount"><?= peso($line['amount']) ?></span>
                 </div>
-                <div class="detail-item">
-                    <span class="label">PAG-IBIG Personal Premium</span>
-                    <span class="amount"><?= peso($employee['pagibig_premium'] ?? 0) ?></span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">PHILHEALTH Personal Premium</span>
-                    <span class="amount"><?= peso(phicTotal($employee)) ?></span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">WITHHOLDING TAX</span>
-                    <span class="amount"><?= peso($employee['withholding_tax'] ?? 0) ?></span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">PAG-IBIG MP2</span>
-                    <span class="amount"><?= peso($employee['pagibig_mp2'] ?? $employee['pagibig_loan'] ?? 0) ?></span>
-                </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>

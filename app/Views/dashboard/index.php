@@ -51,12 +51,32 @@
 </style>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h4 class="fw-bold mb-1">System Dashboard</h4>
-            <p class="text-muted small mb-0">Analytics & overview — Period: <strong><?= date('F Y') ?></strong></p>
+    <?php if (!empty($backup_overdue) && session()->get('role') === 'admin'): ?>
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mb-3 shadow-sm border-0">
+        <div class="small">
+            <i class="fas fa-shield-alt me-2"></i>
+            <strong>Backup Reminder:</strong>
+            <?= empty($last_backup_at) ? 'No database backup has been downloaded yet.' : 'Last backup was on ' . esc(date('M d, Y', strtotime($last_backup_at))) . ' (over 7 days ago).' ?>
+            Save a copy to your USB drive to protect payroll records.
         </div>
-        <span class="text-muted small">Updated: <?= date('M d, Y g:i A') ?></span>
+        <a href="/backup" class="btn btn-warning btn-sm text-dark fw-bold text-nowrap ms-3">Backup Now</a>
+    </div>
+    <?php endif; ?>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h4 class="fw-bold mb-1">
+                System Dashboard
+                <?php if (!empty($is_locked)): ?>
+                    <span class="badge bg-danger ms-2 fs-6"><i class="fas fa-lock me-1"></i>LOCKED</span>
+                <?php endif; ?>
+            </h4>
+            <p class="text-muted small mb-0">Analytics &amp; overview — Period: <strong><?= esc($period_label ?? date('F Y')) ?></strong></p>
+        </div>
+        <form action="/dashboard" method="get" class="d-flex align-items-center gap-2">
+            <input type="month" name="period" class="form-control form-control-sm" value="<?= esc($period ?? date('Y-m')) ?>" onchange="this.form.submit()">
+            <span class="text-muted small text-nowrap">Updated: <?= date('M d, Y g:i A') ?></span>
+        </form>
     </div>
 
     <!-- Metric Cards -->
@@ -230,7 +250,7 @@
                                 <td class="text-center"><?= $i + 1 ?></td>
                                 <td>
                                     <div class="fw-bold"><?= esc($r['full_name']) ?></div>
-                                    <small class="text-muted"><?= $r['emp_code'] ?></small>
+                                    <small class="text-muted"><?= esc($r['emp_code']) ?></small>
                                 </td>
                                 <td><span class="text-muted small"><?= esc($r['office_name'] ?? '—') ?></span></td>
                                 <td class="text-end fw-bold text-navy">₱<?= number_format($r['gross_pay'], 2) ?></td>
@@ -266,7 +286,7 @@
                                 <td class="text-center"><?= $i + 1 ?></td>
                                 <td>
                                     <div class="fw-bold"><?= esc($t['full_name']) ?></div>
-                                    <small class="text-muted"><?= $t['emp_code'] ?></small>
+                                    <small class="text-muted"><?= esc($t['emp_code']) ?></small>
                                 </td>
                                 <td><span class="text-muted small"><?= esc($t['office_name'] ?? '—') ?></span></td>
                                 <td class="text-end fw-bold text-danger">₱<?= number_format($t['total_deduct'], 2) ?></td>
@@ -283,7 +303,7 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Payroll by Office - Bar Chart

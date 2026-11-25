@@ -81,26 +81,30 @@
                             <th class="text-end">PHIC</th>
                             <th class="text-end">BANKS/COOP</th>
                             <th class="text-end">W/TAX</th>
+                            <th class="text-end">OTHER</th>
                             <th class="text-end pe-4">TOTAL DEDUCT</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php
                             $totalGsis = 0; $totalPagibig = 0; $totalPhic = 0;
-                            $totalBank = 0; $totalTax = 0; $totalDeduct = 0;
+                            $totalBank = 0; $totalTax = 0; $totalOther = 0; $totalDeduct = 0;
                         ?>
                         <?php foreach ($results as $row):
-                            $gsis = ($row['gsis_premium'] ?? 0) + ($row['gsis_policy'] ?? 0) + ($row['gsis_other'] ?? 0) + ($row['gsis_ouli'] ?? 0) + ($row['gsis_diff'] ?? 0);
-                            $pagibig = ($row['pagibig_premium'] ?? 0) + ($row['pagibig_loan'] ?? 0) + ($row['pagibig_mp2'] ?? 0);
-                            $phic = ($row['phic'] ?? 0) + ($row['phic_diff'] ?? 0);
-                            $bank = ($row['bank_lbp'] ?? 0) + ($row['bank_mcc'] ?? 0) + ($row['bank_1stvb'] ?? 0) + ($row['bank_other_payables'] ?? 0) + ($row['bank_rbt'] ?? 0);
-                            $tax = $row['withholding_tax'] ?? 0;
+                            $g = $row['groups'];
+                            $gsis = $g['gsis'];
+                            $pagibig = $g['pagibig'];
+                            $phic = $g['phic'];
+                            $bank = $g['banks'];
+                            $tax = $g['tax'];
+                            $other = $g['other'];
                             $totalGsis += $gsis;
                             $totalPagibig += $pagibig;
                             $totalPhic += $phic;
                             $totalBank += $bank;
                             $totalTax += $tax;
-                            $totalDeduct += $row['total_deductions'];
+                            $totalOther += $other;
+                            $totalDeduct += (float) $row['total_deductions'];
                         ?>
                         <tr>
                             <td class="ps-4 fw-bold"><?= esc($row['full_name']) ?></td>
@@ -110,6 +114,7 @@
                             <td class="text-end text-danger">₱<?= number_format($phic, 2) ?></td>
                             <td class="text-end text-danger">₱<?= number_format($bank, 2) ?></td>
                             <td class="text-end text-danger">₱<?= number_format($tax, 2) ?></td>
+                            <td class="text-end text-danger">₱<?= number_format($other, 2) ?></td>
                             <td class="text-end pe-4 fw-bold">₱<?= number_format($row['total_deductions'], 2) ?></td>
                         </tr>
                         <?php endforeach; ?>
@@ -122,6 +127,7 @@
                             <td class="text-end">₱<?= number_format($totalPhic, 2) ?></td>
                             <td class="text-end">₱<?= number_format($totalBank, 2) ?></td>
                             <td class="text-end">₱<?= number_format($totalTax, 2) ?></td>
+                            <td class="text-end">₱<?= number_format($totalOther, 2) ?></td>
                             <td class="text-end pe-4 fw-bold text-success">₱<?= number_format($totalDeduct, 2) ?></td>
                         </tr>
                     </tfoot>

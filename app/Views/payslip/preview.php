@@ -8,26 +8,27 @@
     </div>
 
     <!-- Payslip Paper Design -->
+    <?php $g = $payslip['groups']; ?>
     <div class="payslip-card mx-auto bg-white p-5 shadow-lg" style="max-width: 800px; border-top: 5px solid #12305c;">
         <div class="row mb-4">
             <div class="col-6">
-                <h4 class="fw-bold text-primary mb-0">COMPANY NAME</h4>
+                <h4 class="fw-bold text-primary mb-0"><?= esc($settings['lgu_name'] ?? 'LGU-MAHINOG') ?></h4>
                 <p class="small text-muted">Payroll Management System</p>
             </div>
             <div class="col-6 text-end">
                 <h5 class="fw-bold mb-0">PAY ADVICE</h5>
-                <p class="text-muted">Period: <?= $payslip['payroll_period'] ?></p>
+                <p class="text-muted">Period: <?= esc($payslip['payroll_period']) ?></p>
             </div>
         </div>
 
         <div class="row mb-5 border-bottom pb-3">
             <div class="col-6">
                 <small class="text-muted d-block">EMPLOYEE NAME</small>
-                <span class="fw-bold text-uppercase"><?= $payslip['full_name'] ?></span>
+                <span class="fw-bold text-uppercase"><?= esc($payslip['full_name']) ?></span>
             </div>
             <div class="col-6 text-end">
                 <small class="text-muted d-block">DESIGNATION</small>
-                <span class="fw-bold"><?= $payslip['position'] ?></span>
+                <span class="fw-bold"><?= esc($payslip['position']) ?></span>
             </div>
         </div>
 
@@ -36,14 +37,18 @@
                 <h6 class="fw-bold text-success mb-3 border-bottom pb-2">EARNINGS</h6>
                 <div class="d-flex justify-content-between mb-2">
                     <span>Monthly Rate of Pay</span>
-                    <span>₱<?= number_format($payslip['gross_pay'], 2) ?></span>
+                    <span>₱<?= number_format($payslip['basic_pay'] ?? 0, 2) ?></span>
                 </div>
                 <?php if (!empty($payslip['refund_rata'])): ?>
                 <div class="d-flex justify-content-between mb-2">
-                    <span>Refund / Rata (Pera / ACA Diff.)</span>
+                    <span>Refund / RATA (PERA / ACA Diff.)</span>
                     <span>₱<?= number_format($payslip['refund_rata'], 2) ?></span>
                 </div>
                 <?php endif; ?>
+                <div class="d-flex justify-content-between mt-3 pt-2 border-top fw-bold">
+                    <span>Total Gross Earnings</span>
+                    <span>₱<?= number_format($payslip['gross_pay'], 2) ?></span>
+                </div>
                 <?php if (!empty($payslip['period_of_service'])): ?>
                 <div class="mt-3 small text-muted">
                     Period of Service: <?= esc($payslip['period_of_service']) ?>
@@ -54,22 +59,22 @@
                 <h6 class="fw-bold text-danger mb-3 border-bottom pb-2">DEDUCTIONS</h6>
 
                 <p class="fw-bold small text-muted mb-1 mt-2">GSIS</p>
-                <div class="d-flex justify-content-between small mb-1"><span>Premium (Personal)</span><span>₱<?= number_format($payslip['gsis_premium'] ?? 0, 2) ?></span></div>
-                <div class="d-flex justify-content-between small mb-1"><span>Conso Policy / MPL</span><span>₱<?= number_format($payslip['gsis_policy'] ?? 0, 2) ?></span></div>
-                <div class="d-flex justify-content-between small mb-1"><span>GFAL / EMRGYLN / MPL Lite / CPL</span><span>₱<?= number_format($payslip['gsis_other'] ?? 0, 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>Premium / OULI / Diff</span><span>₱<?= number_format($g['gsis_col1'], 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>Conso Policy / MPL</span><span>₱<?= number_format($g['gsis_policy'], 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>GFAL / EMRGYLN / MPL Lite / CPL</span><span>₱<?= number_format($g['gsis_other'], 2) ?></span></div>
 
                 <p class="fw-bold small text-muted mb-1 mt-3">PAG-IBIG</p>
-                <div class="d-flex justify-content-between small mb-1"><span>Premium (Personal)</span><span>₱<?= number_format($payslip['pagibig_premium'] ?? 0, 2) ?></span></div>
-                <div class="d-flex justify-content-between small mb-1"><span>Salary Loan / MP2</span><span>₱<?= number_format($payslip['pagibig_loan'] ?? 0, 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>Premium (Personal)</span><span>₱<?= number_format($g['pagibig_premium'], 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>Salary Loan / MP2</span><span>₱<?= number_format($g['pagibig_col2'], 2) ?></span></div>
 
                 <p class="fw-bold small text-muted mb-1 mt-3">BANK'S / COOP'S</p>
-                <div class="d-flex justify-content-between small mb-1"><span>LBP / Other Payables</span><span>₱<?= number_format($payslip['bank_lbp'] ?? 0, 2) ?></span></div>
-                <div class="d-flex justify-content-between small mb-1"><span>MCC (Over)</span><span>₱<?= number_format($payslip['bank_mcc'] ?? 0, 2) ?></span></div>
-                <div class="d-flex justify-content-between small mb-1"><span>1stVB / RBT</span><span>₱<?= number_format($payslip['bank_1stvb'] ?? 0, 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>LBP / Other Payables</span><span>₱<?= number_format($g['bank_lbp_col'], 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>MCC (Over)</span><span>₱<?= number_format($g['bank_mcc'], 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>1stVB / RBT</span><span>₱<?= number_format($g['bank_1stvb_col'], 2) ?></span></div>
 
                 <p class="fw-bold small text-muted mb-1 mt-3">OTHER</p>
-                <div class="d-flex justify-content-between small mb-1"><span>PHIC</span><span>₱<?= number_format($payslip['phic'] ?? 0, 2) ?></span></div>
-                <div class="d-flex justify-content-between small mb-1"><span>BIR W/T Tax</span><span>₱<?= number_format($payslip['withholding_tax'] ?? 0, 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>PHIC (+Diff)</span><span>₱<?= number_format($g['phic'], 2) ?></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>BIR W/T Tax</span><span>₱<?= number_format($g['tax'], 2) ?></span></div>
 
                 <div class="d-flex justify-content-between mt-3 pt-2 border-top fw-bold">
                     <span>Total Deductions</span>
