@@ -4,10 +4,12 @@
 /.env.*
 /vendor/
 /node_modules/
+/build/
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
-/.env
-/.env.*
 /writable/
+/graphify-out/.graphify_python
+/graphify-out/.graphify_root
+/graphify-out/cache/
